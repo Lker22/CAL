@@ -3,17 +3,16 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import {
-  House,
   User,
   Cpu,
-  Document,
   Guide,
   ChatDotRound,
   DataAnalysis,
   Setting,
   SwitchButton,
   Expand,
-  Fold
+  Fold,
+  ArrowDown
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -174,23 +173,15 @@ const activeMenu = computed(() => route.path)
 
       <!-- 页面内容 -->
       <el-main class="layout-main">
-        <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route }">
           <transition name="fade" mode="out-in">
-            <component :is="Component" />
+            <component :is="Component" :key="route.path" />
           </transition>
         </router-view>
       </el-main>
     </el-container>
   </el-container>
 </template>
-
-<script>
-// 注册ArrowDown图标（避免setup中使用）
-import { ArrowDown } from '@element-plus/icons-vue'
-export default {
-  components: { ArrowDown }
-}
-</script>
 
 <style scoped>
 .layout-container {

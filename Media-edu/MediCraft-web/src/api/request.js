@@ -58,9 +58,8 @@ request.interceptors.response.use(
   },
   (error) => {
     // 开发阶段无后端时，静默处理网络错误
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.warn('[API] 后端服务未启动，返回模拟数据')
-      // 返回空的模拟响应，不让页面崩溃
+    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED' || error.message === 'Network Error') {
+      console.warn('[API] 后端服务未启动，静默处理')
       return Promise.reject(new Error('服务暂不可用'))
     }
 
@@ -87,7 +86,10 @@ request.interceptors.response.use(
           ElMessage.error(error.message || '请求失败')
       }
     } else {
-      ElMessage.error(error.message || '请求失败')
+      // 非HTTP错误（如取消请求、超时等），不显示全局错误提示
+      if (error.code !== 'ERR_CANCELED') {
+        console.warn('[API] 请求失败:', error.message)
+      }
     }
 
     return Promise.reject(error)

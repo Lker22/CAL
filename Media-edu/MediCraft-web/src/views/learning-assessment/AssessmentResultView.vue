@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment'
+import { CircleCheck, EditPen, VideoCamera } from '@element-plus/icons-vue'
 
 const assessmentStore = useAssessmentStore()
 
@@ -50,6 +51,8 @@ onMounted(async () => {
   loading.value = true
   try {
     await assessmentStore.getAssessmentResult()
+  } catch (error) {
+    console.warn('获取评估结果失败，使用本地数据')
   } finally {
     loading.value = false
   }
@@ -180,15 +183,9 @@ onMounted(async () => {
                   : '#E6A23C'
               "
             >
-              <component
-                :is="
-                  activity.type === 'completed'
-                    ? 'CircleCheck'
-                    : activity.type === 'quiz'
-                    ? 'EditPen'
-                    : 'VideoCamera'
-                "
-              />
+              <CircleCheck v-if="activity.type === 'completed'" />
+              <EditPen v-else-if="activity.type === 'quiz'" />
+              <VideoCamera v-else />
             </el-icon>
             <div class="activity-info">
               <span class="activity-title">{{ activity.title }}</span>

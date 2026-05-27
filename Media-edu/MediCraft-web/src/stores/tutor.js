@@ -43,6 +43,7 @@ export const useTutorStore = defineStore('tutor', () => {
 
       return response
     } catch (error) {
+      console.warn('[Tutor] 提问失败:', error.message)
       throw error
     } finally {
       isAnswering.value = false
@@ -78,6 +79,7 @@ export const useTutorStore = defineStore('tutor', () => {
 
       return currentAnswer.value
     } catch (error) {
+      console.warn('[Tutor] 流式提问失败，使用模拟回复:', error.message)
       throw error
     } finally {
       isAnswering.value = false
@@ -94,7 +96,8 @@ export const useTutorStore = defineStore('tutor', () => {
       historyRecords.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Tutor] 获取历史记录失败:', error.message)
+      historyRecords.value = []
     } finally {
       historyLoading.value = false
     }

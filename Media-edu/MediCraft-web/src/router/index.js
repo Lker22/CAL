@@ -174,4 +174,15 @@ const router = createRouter({
   ]
 })
 
+// 抑制导航过程中的parentNode错误
+const originalPush = router.push
+router.push = function (...args) {
+  return originalPush.apply(this, args).catch((err) => {
+    if (err && err.message && err.message.includes('parentNode')) {
+      return
+    }
+    throw err
+  })
+}
+
 export default router

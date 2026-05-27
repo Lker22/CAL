@@ -29,6 +29,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       paths.value.push(response.data)
       return response
     } catch (error) {
+      console.warn('[LearningPath] 生成路径失败:', error.message)
       throw error
     } finally {
       pathLoading.value = false
@@ -45,7 +46,8 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       paths.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[LearningPath] 获取路径列表失败:', error.message)
+      paths.value = []
     } finally {
       pathLoading.value = false
     }
@@ -62,7 +64,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       currentSteps.value = response.data.steps || []
       return response
     } catch (error) {
-      throw error
+      console.warn('[LearningPath] 获取路径详情失败:', error.message)
     } finally {
       pathLoading.value = false
     }
@@ -82,6 +84,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       }
       return response
     } catch (error) {
+      console.warn('[LearningPath] 完成步骤失败:', error.message)
       throw error
     }
   }
@@ -95,7 +98,8 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       recommendedResources.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[LearningPath] 获取推荐资源失败:', error.message)
+      recommendedResources.value = []
     }
   }
 
@@ -110,6 +114,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       currentSteps.value = response.data.steps || []
       return response
     } catch (error) {
+      console.warn('[LearningPath] 调整路径失败:', error.message)
       throw error
     } finally {
       pathLoading.value = false
@@ -128,7 +133,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
         currentSteps.value = []
       }
     } catch (error) {
-      throw error
+      console.warn('[LearningPath] 删除路径失败:', error.message)
     }
   }
 

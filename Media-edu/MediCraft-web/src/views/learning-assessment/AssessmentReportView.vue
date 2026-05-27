@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAssessmentStore } from '@/stores/assessment'
 import { formatDate } from '@/utils/format'
+import { Clock, CircleCheck, Trophy, Warning, Reading } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const assessmentStore = useAssessmentStore()
@@ -53,6 +54,8 @@ const generateReport = async () => {
   loading.value = true
   try {
     await assessmentStore.generateReport({ period: selectedPeriod.value })
+  } catch (error) {
+    console.warn('生成报告失败')
   } finally {
     loading.value = false
   }
@@ -72,6 +75,8 @@ onMounted(async () => {
   loading.value = true
   try {
     await assessmentStore.getAssessmentReport({ period: selectedPeriod.value })
+  } catch (error) {
+    console.warn('获取评估报告失败，使用本地数据')
   } finally {
     loading.value = false
   }
@@ -198,13 +203,6 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-
-<script>
-import { Clock, CircleCheck, Trophy, Warning, Reading } from '@element-plus/icons-vue'
-export default {
-  components: { Clock, CircleCheck, Trophy, Warning, Reading }
-}
-</script>
 
 <style scoped>
 .assessment-report-page {

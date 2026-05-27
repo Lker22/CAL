@@ -2,9 +2,9 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { useTutorStore } from '@/stores/tutor'
 import { ElMessage } from 'element-plus'
-import { Promotion, Picture } from '@element-plus/icons-vue'
+import { Promotion, Picture, Close } from '@element-plus/icons-vue'
 import StreamText from '@/components/markdown/StreamText.vue'
-import FileUpload from '@/components/upload/FileUpload.vue'
+import { fileToBase64 } from '@/utils/upload'
 
 const tutorStore = useTutorStore()
 
@@ -103,9 +103,39 @@ const handleSampleQuestion = (question) => {
   sendMessage()
 }
 
-// 处理图片上传
-const handleImageUpload = (result) => {
-  uploadedImages.value.push(result)
+// 图片上传前验证
+const beforeImageUpload = (file) => {
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.warning('只能上传图片文件')
+    return false
+  }
+  const isLt5M = file.size / 1024 / 1024 < 5
+  if (!isLt5M) {
+    ElMessage.warning('图片大小不能超过5MB')
+    return false
+  }
+  if (uploadedImages.value.length >= 3) {
+    ElMessage.warning('最多上传3张图片')
+    return false
+  }
+  return true
+}
+
+// 自定义图片上传(转base64)
+const handleCustomUpload = async (options) => {
+  const { file } = options
+  try {
+    const base64 = await fileToBase64(file)
+    uploadedImages.value.push({
+      name: file.name,
+      url: base64,
+      type: file.type,
+      size: file.size
+    })
+  } catch {
+    ElMessage.error('图片上传失败')
+  }
 }
 
 // 移除图片
@@ -226,15 +256,18 @@ const handleKeydown = (e) => {
     <!-- 输入区域 -->
     <div class="input-area">
       <div class="input-wrapper">
-        <FileUpload
-          type="image"
-          :max-count="3"
-          :max-size="5"
-          :model-value="uploadedImages"
-          use-base64
-          @success="handleImageUpload"
-          class="upload-btn"
-        />
+        <el-upload
+          class="compact-upload"
+          :show-file-list="false"
+          :before-upload="beforeImageUpload"
+          :http-request="handleCustomUpload"
+          accept="image/*"
+          :disabled="isLoading || uploadedImages.length >= 3"
+        >
+          <el-tooltip content="上传图片(最多3张)" placement="top">
+            <el-icon class="upload-icon-btn" :size="20"><Picture /></el-icon>
+          </el-tooltip>
+        </el-upload>
         <el-input
           v-model="inputText"
           type="textarea"
@@ -257,13 +290,6 @@ const handleKeydown = (e) => {
     </div>
   </div>
 </template>
-
-<script>
-import { Close } from '@element-plus/icons-vue'
-export default {
-  components: { Close }
-}
-</script>
 
 <style scoped>
 .tutor-question-page {
@@ -424,8 +450,7 @@ export default {
 .image-preview-area {
   display: flex;
   gap: 8px;
-  padding: 8px 24px;
-  border-top: 1px solid #f0f0f0;
+  padding: 8px 24px 0;
 }
 
 .preview-item {
@@ -468,8 +493,31 @@ export default {
   align-items: flex-end;
 }
 
-.upload-btn {
+.compact-upload {
   flex-shrink: 0;
+}
+
+.upload-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f5f7fa;
+  color: #909399;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.upload-icon-btn:hover {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.input-wrapper :deep(.el-textarea) {
+  flex: 1;
+  min-width: 0;
 }
 
 .input-wrapper :deep(.el-textarea__inner) {

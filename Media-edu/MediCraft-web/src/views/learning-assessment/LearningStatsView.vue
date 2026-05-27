@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment'
+import { Clock, Document, EditPen, Trophy } from '@element-plus/icons-vue'
 
 const assessmentStore = useAssessmentStore()
 
@@ -41,6 +42,8 @@ onMounted(async () => {
   loading.value = true
   try {
     await assessmentStore.getLearningStats()
+  } catch (error) {
+    console.warn('获取统计数据失败，使用本地数据')
   } finally {
     loading.value = false
   }
@@ -165,13 +168,6 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-
-<script>
-import { Clock, Document, EditPen, Trophy } from '@element-plus/icons-vue'
-export default {
-  components: { Clock, Document, EditPen, Trophy }
-}
-</script>
 
 <style scoped>
 .learning-stats-page {

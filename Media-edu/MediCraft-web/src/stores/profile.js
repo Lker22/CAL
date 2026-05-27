@@ -42,7 +42,7 @@ export const useProfileStore = defineStore('profile', () => {
       updateDimensions(response.data)
       return response
     } catch (error) {
-      throw error
+      console.warn('[Profile] 获取画像失败:', error.message)
     } finally {
       profileLoading.value = false
     }
@@ -93,6 +93,7 @@ export const useProfileStore = defineStore('profile', () => {
 
       return response
     } catch (error) {
+      console.warn('[Profile] 发送消息失败:', error.message)
       throw error
     }
   }
@@ -112,6 +113,7 @@ export const useProfileStore = defineStore('profile', () => {
       })
       return response
     } catch (error) {
+      console.warn('[Profile] 开始画像构建失败:', error.message)
       throw error
     } finally {
       isBuilding.value = false
@@ -129,7 +131,7 @@ export const useProfileStore = defineStore('profile', () => {
       updateDimensions(response.data)
       return response
     } catch (error) {
-      throw error
+      console.warn('[Profile] 更新画像失败:', error.message)
     } finally {
       profileLoading.value = false
     }

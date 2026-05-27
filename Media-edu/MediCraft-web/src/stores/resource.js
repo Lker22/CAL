@@ -29,7 +29,8 @@ export const useResourceStore = defineStore('resource', () => {
       agents.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Resource] 获取智能体列表失败:', error.message)
+      agents.value = []
     }
   }
 
@@ -50,6 +51,7 @@ export const useResourceStore = defineStore('resource', () => {
       generationTasks.value.push(response.data)
       return response
     } catch (error) {
+      console.warn('[Resource] 生成资源失败:', error.message)
       throw error
     }
   }
@@ -70,7 +72,7 @@ export const useResourceStore = defineStore('resource', () => {
       }
       return response
     } catch (error) {
-      throw error
+      console.warn('[Resource] 获取生成进度失败:', error.message)
     }
   }
 
@@ -84,7 +86,8 @@ export const useResourceStore = defineStore('resource', () => {
       resources.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Resource] 获取资源列表失败:', error.message)
+      resources.value = []
     } finally {
       resourceLoading.value = false
     }
@@ -100,7 +103,7 @@ export const useResourceStore = defineStore('resource', () => {
       currentResource.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Resource] 获取资源详情失败:', error.message)
     } finally {
       resourceLoading.value = false
     }
@@ -117,7 +120,7 @@ export const useResourceStore = defineStore('resource', () => {
         currentResource.value = null
       }
     } catch (error) {
-      throw error
+      console.warn('[Resource] 删除资源失败:', error.message)
     }
   }
 

@@ -29,7 +29,9 @@ export const useAssessmentStore = defineStore('assessment', () => {
       assessmentReport.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Assessment] 获取报告失败，使用本地数据:', error.message)
+      // 降级：使用默认数据
+      assessmentReport.value = null
     } finally {
       reportLoading.value = false
     }
@@ -45,7 +47,8 @@ export const useAssessmentStore = defineStore('assessment', () => {
       assessmentResult.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Assessment] 获取评估结果失败，使用本地数据:', error.message)
+      assessmentResult.value = null
     } finally {
       resultLoading.value = false
     }
@@ -61,7 +64,8 @@ export const useAssessmentStore = defineStore('assessment', () => {
       learningStats.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Assessment] 获取统计数据失败，使用本地数据:', error.message)
+      learningStats.value = null
     } finally {
       statsLoading.value = false
     }
@@ -77,7 +81,8 @@ export const useAssessmentStore = defineStore('assessment', () => {
       assessmentReport.value = response.data
       return response
     } catch (error) {
-      throw error
+      console.warn('[Assessment] 生成报告失败:', error.message)
+      assessmentReport.value = null
     } finally {
       reportLoading.value = false
     }

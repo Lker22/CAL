@@ -12,6 +12,22 @@ import { printDefaultCredentials } from './utils/mockAuth'
 const app = createApp(App)
 const pinia = createPinia()
 
+// 全局错误处理：抑制Vue过渡动画中常见的parentNode错误
+app.config.errorHandler = (err, instance, info) => {
+  if (err && err.message && err.message.includes('parentNode')) {
+    // 静默处理，这是Vue transition/router-view的已知问题
+    return
+  }
+  console.error(`[Vue Error] ${info}:`, err)
+}
+
+// 全局未捕获Promise异常处理
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && event.reason.message && event.reason.message.includes('parentNode')) {
+    event.preventDefault()
+  }
+})
+
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, {
