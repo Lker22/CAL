@@ -1,0 +1,37 @@
+当前架构的核心冗余点：
+1.Controller 泛滥：5 大模块每个一套 Controller，很多 CRUD、参数校验、返回封装都重复。
+
+2.Service 职责混杂：画像、资源、路径、辅导、评估的 Service 都独立，AI 调用、Redis 缓存、RabbitMQ 异步逻辑到处复制。
+
+3.AI 能力碎片化：6 个智能体、对话、抽取、生成都散在不同 Service，大模型调用逻辑重复，改一处要改 N 处。
+
+4.公共逻辑没抽离：用户上下文、结果封装、异常处理、文件上传每个模块重复写。
+前端接口分散：/profile、/resource、/path… 路径零散，统一认证、限流、监控难加。
+
+com.education
+├── common                // 全局公共（只写一次）
+│   ├── result            // Result.java（你已有）
+│   ├── exception         // 全局异常
+│   ├── utils              // BaseContext、SpringContextUtil
+│   ├── config             // Redis、SpringAI、RabbitMQ配置
+│   └── constant           // 全局常量
+├── ai                    // AI核心能力（统一收口，不散落）
+│   ├── service            // AIChatService、AIGenerateService
+│   └── impl               // 统一AI调用实现
+├── module                 // 5大业务域（高内聚）
+│   ├── user               // 用户+画像（合并，不拆分）
+│   │   ├── controller     // UserProfileController
+│   │   ├── service        // UserProfileService
+│   │   ├── impl
+│   │   ├── mapper
+│   │   └── entity
+│   ├── resource           // AI资源生成
+│   │   ├── controller
+│   │   └── ...
+│   ├── path               // 学习路径
+│   │   └── ...
+│   ├── tutor              // 智能辅导
+│   │   └── ...
+│   └── assessment         // 学习评估
+│       └── ...
+└── EducationApplication.java

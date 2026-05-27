@@ -1,0 +1,101 @@
+项目分为 5大核心模块 ，每个模块对应独立的视图、API和状态管理：
+
+模块名称 路径 功能描述 
+1.用户与学习画像   /user/ , /profile/  用户登录注册、学习画像构建与展示 
+2.AI多智能体资源生成 /agent/ , /resource/ 智能体管理、学习资源生成（文档/思维导图/题库等） 
+3.学习路径规划 /path/ , /recommend/ 个性化学习路径生成、步骤管理、资源推荐 
+4.智能辅导 /tutor/ AI答疑、多模态提问、答疑历史 
+5.学习效果评估 /assessment/ , /learning/ 评估报告、学习统计、薄弱点分析
+
+
+## 四、视图组件与功能对应表
+### 4.1 用户与学习画像模块
+视图组件 路由路径 功能说明 
+LoginView.vue /login 用户登录页面 
+RegisterView.vue /register 用户注册页面 
+ProfileBuildView.vue /profile/build 学习画像构建（对话式） 
+ProfileDisplayView.vue /profile/display 学习画像展示 
+ProfileQueryView.vue /profile/query 画像查询与分析 
+UserInfoView.vue /user/info 用户信息管理
+
+### 4.2 AI多智能体资源生成模块
+视图组件 路由路径 功能说明 
+AgentListView.vue /agent/list 智能体列表展示（6大角色）
+ ResourceGenerateView.vue /resource/generate 资源生成界面 GenerationProgressView.vue /generation/progress 生成进度展示 ResourceListView.vue /resource/list 生成资源列表 
+ResourceDetailView.vue /resource/detail/:id 资源详情查看
+
+### 4.3 学习路径规划与智能推送模块
+视图组件 路由路径 功能说明 
+PathGenerateView.vue /path/generate 一键生成学习路径 
+PathListView.vue /path/list 学习路径列表 
+PathStepView.vue /path/step/:id 学习步骤详情（打卡） ResourceRecommendView.vue /recommend/resource 智能资源推荐 PathAdjustView.vue /path/adjust 动态调整学习路径
+
+### 4.4 智能辅导模块
+视图组件 路由路径 功能说明 
+TutorQuestionView.vue /tutor/question 提问界面（支持多模态） TutorAnswerView.vue /tutor/answer AI解答展示 
+TutorHistoryView.vue /tutor/history 答疑历史记录
+
+### 4.5 学习效果评估模块
+视图组件 路由路径 功能说明 
+AssessmentReportView.vue /assessment/report 学习评估报告 AssessmentResultView.vue /assessment/result 评估结果详情 
+LearningStatsView.vue /learning/stats 学习数据统计图表
+
+
+## API接口总览（后端需实现）
+### 3.1 用户模块 (src/api/user.js)
+API路径     HTTP方法          功能            请求参数 
+/user/login  POST         用户登录   { username, password } 
+/user/register    POST  用户注册    { username, password, email, nickname } 
+/user/info      GET        获取当前用户信息             - 
+/user/info    PUT          更新用户信息 { nickname, email, avatar, phone } 
+/user/password    PUT   修改密码 { oldPassword, newPassword }
+ /user/logout    POST    退出登录
+
+### 3.2 学习画像模块 (src/api/profile.js)
+API路径          HTTP方法      功能           请求参数  
+/profile           GET        获取学习画像 - 
+/profile          PUT         更新学习画像 画像维度数据 
+/profile/build/start      POST         开始画像构建对话 - 
+/profile/build/chat       POST          发送画像构建消息 { message, context } 
+/profile/build/stream   POST    流式构建画像(SSE) { message, context } /profile/chat/history     GET     获取画像构建历史 - /profile/reset POST 重置画像
+
+### 3.3 学习资源模块 (src/api/resource.js)
+API路径         HTTP方法        功能        请求参数 
+/resource/agents GET 获取智能体列表 - 
+/resource/agents/{agentId}    GET    获取智能体详情   agentId 
+/resource/generate       POST         生成学习资源(异步) { agentId, resourceType, topic, params } 
+/resource/generate/progress/{taskId}   GET  获取生成进度    taskId 
+/resource/list          GET       获取资源列表     { type, keyword, page, pageSize } /resource/detail/{resourceId}    GET      获取资源详情 resourceId /resource/{resourceId}   DELETE         删除资源       resourceId /resource/download/{resourceId}  GET    下载资源   resourceId
+
+### 3.4 学习路径模块 (src/api/learningPath.js)
+API路径 HTTP方法 功能 请求参数 
+/learning-path/generate    POST   一键生成学习路径   { subject, goal, duration } /learning-path/list    GET    获取学习路径列表       { page, pageSize, status } 
+/learning-path/detail/{pathId}   GET   获取路径详情(含步骤)     pathId 
+/learning-path/step/{stepId}/complete    POST  完成学习步骤(打卡) { duration, notes, score }
+/learning-path/{pathId}/recommend     GET    获取智能资源推荐    pathId 
+/learning-path/{pathId}/adjust      PUT   动态调整学习路径 { adjustmentType, params } /learning-path/{pathId}         DELETE     删除学习路径         pathId 
+/learning-path/behavior        POST        记录学习行为 { pathId, stepId, behaviorType, duration }
+
+
+### 3.5 智能辅导模块 (src/api/tutor.js)
+API路径                    HTTP方法      功能        请求参数 
+/tutor/ask                    POST    发送提问   { text, images: [] } 
+/tutor/ask/stream        POST   流式提问(SSE)   { text, images: [] } 
+/tutor/history                 GET       获取答疑历史   { page, pageSize } 
+/tutor/detail/{recordId}   GET    获取答疑详情    recordId 
+/tutor/{recordId}        DELETE     删除答疑记录     recordId
+
+### 3.6 学习评估模块 (src/api/assessment.js)
+API路径               HTTP方法                      功能           请求参数 
+/assessment/report                GET           获取评估报告 { startDate, endDate } /assessment/report/generate POST  生成评估报告 { pathId, includeModules } /assessment/result                GET        获取评估结果 { reportId } 
+/assessment/stats                  GET     获取学习统计 { startDate, endDate, type } 
+/assessment/weak-points      GET      获取薄弱点分析 - 
+/assessment/trend                GET      获取学习趋势 { period }
+
+
+### 3.7 文件上传模块 (src/api/upload.js)
+API路径 HTTP方法 功能 请求参数 
+/upload/image POST 上传图片 multipart/form-data 
+/upload/document POST 上传文档 multipart/form-data 
+/upload POST 通用文件上传 multipart/form-data
+
