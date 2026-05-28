@@ -2,28 +2,22 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { profileApi } from '@/api/profile'
 
-/**
- * 学习画像状态管理
- * 管理学习画像的6大维度：知识基础、认知风格、学习目标、易错点、学习节奏、资源偏好
- */
 export const useProfileStore = defineStore('profile', () => {
-  // 学习画像数据
   const profile = ref(null)
   const profileLoading = ref(false)
   const profileDimensions = ref({
-    knowledgeBase: null,      // 知识基础
-    cognitiveStyle: null,     // 认知风格
-    learningGoals: null,      // 学习目标
-    errorPoints: null,        // 易错点
-    learningRhythm: null,     // 学习节奏
-    resourcePreference: null  // 资源偏好
+    knowledgeBase: null,
+    cognitiveStyle: null,
+    learningGoals: null,
+    errorPoints: null,
+    learningRhythm: null,
+    resourcePreference: null
   })
 
-  // 对话上下文（画像构建对话）
   const chatMessages = ref([])
+  const sessionId = ref(null)
   const isBuilding = ref(false)
 
-  // 画像完成度
   const profileCompletion = computed(() => {
     if (!profile.value) return 0
     const dimensions = Object.values(profileDimensions.value)
@@ -31,9 +25,6 @@ export const useProfileStore = defineStore('profile', () => {
     return Math.round((completed / dimensions.length) * 100)
   })
 
-  /**
-   * 获取学习画像
-   */
   async function getProfile() {
     profileLoading.value = true
     try {
@@ -48,9 +39,6 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  /**
-   * 更新画像维度数据
-   */
   function updateDimensions(profileData) {
     if (!profileData) return
     profileDimensions.value = {
@@ -65,6 +53,8 @@ export const useProfileStore = defineStore('profile', () => {
 
   /**
    * 发送画像构建对话消息
+   * 后端期望: { context: sessionId(String), message: 用户输入(String) }
+   * 后端返回: { aiReply: "...", profile?: {...} }
    */
   async function sendChatMessage(message) {
     chatMessages.value.push({
@@ -76,17 +66,17 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const response = await profileApi.buildProfile({
         message,
-        context: chatMessages.value
+        context: sessionId.value  // 发送 sessionId 字符串，不是消息数组
       })
 
       chatMessages.value.push({
         role: 'assistant',
-        content: response.data.reply,
+        content: response.data.aiReply,
         timestamp: Date.now()
       })
 
-      // 如果画像已更新，同步更新
-      if (response.data.profileUpdated) {
+      // 如果画像已抽取
+      if (response.data.profile) {
         profile.value = response.data.profile
         updateDimensions(response.data.profile)
       }
@@ -100,15 +90,18 @@ export const useProfileStore = defineStore('profile', () => {
 
   /**
    * 开始画像构建对话
+   * 后端返回: Result { data: "sessionId字符串" }
    */
   async function startProfileBuild() {
     isBuilding.value = true
     chatMessages.value = []
+    sessionId.value = null
     try {
       const response = await profileApi.startBuild()
+      sessionId.value = response.data  // 后端直接返回 sessionId 字符串
       chatMessages.value.push({
         role: 'assistant',
-        content: response.data.greeting,
+        content: '你好！我是你的智能学习助手，接下来我会通过对话来了解你的学习情况。请告诉我你的专业和年级？',
         timestamp: Date.now()
       })
       return response
@@ -120,9 +113,6 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  /**
-   * 更新学习画像
-   */
   async function updateProfile(profileData) {
     profileLoading.value = true
     try {
@@ -137,11 +127,9 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  /**
-   * 清空对话上下文
-   */
   function clearChatContext() {
     chatMessages.value = []
+    sessionId.value = null
     isBuilding.value = false
   }
 
@@ -150,6 +138,7 @@ export const useProfileStore = defineStore('profile', () => {
     profileLoading,
     profileDimensions,
     chatMessages,
+    sessionId,
     isBuilding,
     profileCompletion,
     getProfile,
