@@ -9,6 +9,7 @@ import com.education.user.mapper.StudentProfileMapper;
 import com.education.user.service.StudentProfileService;
 import org.springframework.stereotype.Service;
 
+//画像持久化服务--学生画像安全更新
 @Service
 public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper, StudentProfile>
         implements StudentProfileService {

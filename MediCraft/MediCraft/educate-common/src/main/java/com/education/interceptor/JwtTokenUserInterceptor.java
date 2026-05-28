@@ -27,8 +27,12 @@ public class JwtTokenUserInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 1. 从请求头中获取 token
-        String token = request.getHeader(jwtProperties.getUserTokenName());
+        // 1. 从请求头中获取 token，去掉 "Bearer " 前缀
+        String header = request.getHeader(jwtProperties.getUserTokenName());
+        String token = null;
+        if (header != null && header.startsWith("Bearer ")) {
+            token = header.substring(7);
+        }
         log.info("拦截到请求：{}，token：{}", request.getRequestURI(), token);
 
         // 2. 校验 token

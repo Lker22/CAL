@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn dependency:tree -Dincludes=com.alibaba.cloud -pl educate-common -q)",
+      "Bash(mvn dependency:tree -Dincludes=*nacos*)",
+      "Bash(mvn dependency:tree -pl educate-common -Dincludes=org.projectlombok)",
+      "Bash(mvn clean *)",
+      "Bash(java *)",
+      "WebSearch",
+      "Bash(mvn dependency:tree -Dincludes=org.projectlombok)",
+      "WebFetch(domain:projectlombok.org)",
+      "WebFetch(domain:central.sonatype.com)",
+      "Read(//d/JAVA/**)",
+      "Read(//d//**)",
+      "Bash(mvn dependency:resolve -pl educate-common)",
+      "Bash(\"D:/JAVA/bin/java\" -version)",
+      "Bash(D:/Java.study/类库/jdk17/bin/java *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/user/login)",
+      "Bash(curl *)",
+      "Bash(JAVA_HOME=D:/Java.study/类库/jdk17 PATH=D:/Java.study/类库/jdk17/bin:__TRACKED_VAR__ mvn --version)",
+      "Bash(JAVA_HOME=D:/Java.study/类库/jdk17 PATH=D:/Java.study/类库/jdk17/bin:__TRACKED_VAR__ mvn clean compile -f 'C:/Users/29464/Desktop/shortcut file/MediCraft/MediCraft/pom.xml')",
+      "Bash(JAVA_HOME=\"D:/Java.study/类库/jdk17\" PATH=\"D:/Java.study/类库/jdk17/bin:$PATH\" mvn spring-boot:run *)",
+      "Bash(JAVA_HOME=D:/Java.study/类库/jdk17 PATH=D:/Java.study/类库/jdk17/bin:__TRACKED_VAR__ mvn dependency:tree -Dincludes=org.springframework.ai:spring-ai-openai*)",
+      "Bash(redis-cli ping *)",
+      "Bash(setx JAVA_HOME *)",
+      "Bash(cmd.exe *)",
+      "Bash(export JAVA_HOME=\"D:/Java.study/类库/jdk17\")",
+      "Bash(mvn --version)"
+    ]
+  }
+}

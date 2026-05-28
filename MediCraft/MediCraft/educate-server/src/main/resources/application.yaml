@@ -2,36 +2,40 @@ server:
   port: 8080
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAutoConfiguration
   datasource:
     url: jdbc:mysql://localhost:3306/MediCraft?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
     password: 822032abc
+  # AI 配置（通过阿里百炼 OpenAI 兼容接口，支持切换模型）
+  # 切换模型只需修改 chat.model 值，可用模型：
+  #   千问: qwen-plus, qwen-turbo, qwen-max
+  #   DeepSeek: deepseek-v3, deepseek-r1
+  #   MiMo: MiMo
   ai:
     dashscope:
       api-key: ${OPENAI_API_KEY}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
       chat:
-        options:
-          model: qwen3-vl-plus
-    openai: # openai 配置
-      base-url: https://dashscope.aliyuncs.com/compatible-mode # 阿里百炼 api 地址
-      #      base-url: https://api.chatanywhere.tech # api地址
-      api-key: ${ALIYUN_API_KEY} # 读取环境变量中的阿里百炼 api key
-      #      api-key: ${OPENAI_API_KEY} # 读取环境变量中的api key
-      chat:
-        options:
-          model: qwen-plus #阿里百炼 模型名称
-        enabled: false # 关闭 OpenAI 配置
-  #          model: gpt-3.5-turbo # 模型名称
+        model: qwen-plus
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 logging:
   level:
     com:
-      sky:
+      education:
         mapper: debug
         service: info
         controller: info
 
 education:
   jwt:
-    user-secret-key: AIStudySystem123456789987654321   # 原来硬编码的密钥
-    user-ttl: 7200000                                   # 2小时 = 2*60*60*1000
+    user-secret-key: MySuperSecretKey1234567890abcdefghijklmnopqrstuvwxyz    # 原来硬编码的密钥
+    user-ttl: 7200000                                                        # 2小时 = 2*60*60*1000
     user-token-name: Authorization

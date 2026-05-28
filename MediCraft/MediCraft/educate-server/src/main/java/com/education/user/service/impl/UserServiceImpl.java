@@ -119,10 +119,16 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
             "ai:login:token:" + user.getId(),
                 token,
                 jwtProperties.getUserTtl(),
-                TimeUnit.HOURS
+                TimeUnit.MILLISECONDS
         );
 
-        return Result.success(token);
+        // 返回token对象，与前端 stores/user.js 的 res.data.token 对齐
+        HashMap<String, Object> loginResult = new HashMap<>();
+        loginResult.put("token", token);
+        loginResult.put("userId", user.getId());
+        loginResult.put("username", user.getUsername());
+        loginResult.put("nickName", user.getNickName());
+        return Result.success(loginResult);
     }
 
     @Override

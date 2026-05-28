@@ -10,6 +10,7 @@ import com.education.utils.SpringContextUtil;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -21,10 +22,16 @@ public class AIChatServiceImpl implements AIChatService {
         this.chatClient = chatClientBuilder.build();
     }
 
+    //AI引导对话
     @Override
     public String chatWithAI(String sessionId, String userMessage) {
+        // 1. 获取对话上下文服务（手动从Spring拿Bean，解决循环依赖）
         ChatContextService chatContextService = SpringContextUtil.getBean(ChatContextService.class);
+        // 2. 从Redis获取当前会话的历史对话
         List<ChatContext> history = chatContextService.getChatContextFromRedis(sessionId);
+        if (history == null) {
+            history = new ArrayList<>();
+        }
 
         String promptTemplate = """
                 你是智能学习助手，负责引导用户完善个人学习画像，只收集以下信息：
@@ -43,38 +50,46 @@ public class AIChatServiceImpl implements AIChatService {
                 要求：语气友好简洁，只问未收集的信息，用户输入“完成”则结束收集。
                 """;
 
-        // 拼接参数
+        // 格式化历史对话
         String historyStr = formatHistory(history);
+
+        // 替换模板变量，生成最终给AI的提示词
         String prompt = promptTemplate
                 .replace("{history}", historyStr)
                 .replace("{msg}", userMessage);
 
-        //调用
+        //调用Spring AI，获取回复
         String reply = chatClient.prompt()
-                .user(prompt)
-                .call()
-                .content();
+                .user(prompt)// 传入提示词
+                .call() // 调用模型
+                .content(); // 获取文本回复
 
         // 保存对话
         ChatContext ctx = new ChatContext();
-        ctx.setUserId(BaseContext.getCurrentId());
-        ctx.setSessionId(sessionId);
-        ctx.setUserMessage(userMessage);
-        ctx.setAiReply(reply);
-        ctx.setIsExtractProfile(0); // 这里修复为 int 0
-        ctx.setChatType("profile");
+        ctx.setUserId(BaseContext.getCurrentId());// 当前登录用户ID
+        ctx.setSessionId(sessionId); // 会话ID
+        ctx.setUserMessage(userMessage); // 用户输入
+        ctx.setAiReply(reply); // AI回复
+        ctx.setIsExtractProfile(0); //未抽取画像标记（int类型）
+        ctx.setChatType("profile"); // 对话类型：画像收集
 
+        // 保存对话：更新Redis缓存 + 入库持久化
         history.add(ctx);
         chatContextService.cacheChatContext(sessionId, history);
         chatContextService.saveChatContext(ctx);
 
-        return reply;
+        return reply;// 返回AI回复给前端
     }
 
+    //抽取画像
     @Override
     public StudentProfile extractProfileFromChat(String sessionId) {
+        //  获取对话服务 + 读取历史对话
         ChatContextService chatContextService = SpringContextUtil.getBean(ChatContextService.class);
         List<ChatContext> history = chatContextService.getChatContextFromRedis(sessionId);
+        if (history == null) {
+            history = new ArrayList<>();
+        }
 
         String extractPromptTemplate = """
                 从以下对话中提取学生学习画像，严格返回JSON格式：
@@ -84,6 +99,7 @@ public class AIChatServiceImpl implements AIChatService {
                 对话内容：{history}
                 """;
 
+        // 格式化对话 + 生成最终提示词
         String historyStr = formatHistory(history);
         String finalPrompt = extractPromptTemplate.replace("{history}", historyStr);
 
@@ -93,18 +109,21 @@ public class AIChatServiceImpl implements AIChatService {
                 .call()
                 .content();
 
+        // JSON转Java对象,强转（学生画像实体）
         StudentProfile profile = JSON.parseObject(json, StudentProfile.class);
         profile.setUpdateScene("对话抽取");
 
-        // 标记已抽取
+        // 标记已抽取并更新数据库
         for (ChatContext c : history) {
             c.setIsExtractProfile(1); // 修复为 int 1
             chatContextService.updateById(c);
         }
 
-        return profile;
+        return profile;// 返回结构化画像
     }
 
+    //格式化对话
+    // 把List<ChatContext> 转成可读文本：用户：xx \n AI：xx
     private String formatHistory(List<ChatContext> list) {
         StringBuilder sb = new StringBuilder();
         for (ChatContext c : list) {

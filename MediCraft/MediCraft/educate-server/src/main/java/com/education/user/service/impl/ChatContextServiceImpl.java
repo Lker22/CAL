@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+//对话存储服务
 @Service
 public class ChatContextServiceImpl
         extends ServiceImpl<ChatContextMapper, ChatContext>
@@ -22,6 +23,7 @@ public class ChatContextServiceImpl
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+    // 生成唯一会话ID（UUID去横杠）
     @Override
     public String generateSessionId() {
         return UUID.randomUUID().toString().replace("-", "");
