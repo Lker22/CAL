@@ -11,7 +11,7 @@ import com.education.entity.AiAgent;
 import com.education.entity.LearningResource;
 import com.education.entity.ResourceGenerateTask;
 import jakarta.annotation.Resource;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,8 +27,7 @@ public class ResourceService {
     private ResourceGenerateTaskMapper taskMapper;
     @Resource
     private LearningResourceMapper resourceMapper;
-    @Resource
-    private RabbitTemplate rabbitTemplate;
+
     @Resource
     private AgentStrategyFactory agentStrategyFactory;
 

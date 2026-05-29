@@ -9,7 +9,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/MediCraft?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 822032abc
+    password: 1234
   # AI 配置（通过阿里百炼 OpenAI 兼容接口，支持切换模型）
   # 切换模型只需修改 chat.model 值，可用模型：
   #   千问: qwen-plus, qwen-turbo, qwen-max
@@ -17,10 +17,10 @@ spring:
   #   MiMo: MiMo
   ai:
     dashscope:
-      api-key: ${OPENAI_API_KEY}
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: tp-crov2wwcwg03mxsje7zlh7haqlj4f3ue153pmq15o6mbt9hx
+      base-url: https://token-plan-cn.xiaomimimo.com/v1
       chat:
-        model: qwen-plus
+        model: mimo-v2-pro
   data:
     redis:
       host: localhost
