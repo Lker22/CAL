@@ -40,3 +40,9 @@ build/
 ###application.yaml###
 /src/main/resources/application.yaml
 
+
+# 忽略前端项目 MediCraft
+MediCraft/
+# 忽略前端依赖文件
+package-lock.json
+node_modules/
