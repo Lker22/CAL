@@ -14,7 +14,6 @@ spring:
   # 切换模型只需修改 chat.model 值，可用模型：
   #   千问: qwen-plus, qwen-turbo, qwen-max
   #   DeepSeek: deepseek-v3, deepseek-r1
-  #   MiMo: MiMo
   ai:
     dashscope:
       api-key: ${OPENAI_API_KEY}

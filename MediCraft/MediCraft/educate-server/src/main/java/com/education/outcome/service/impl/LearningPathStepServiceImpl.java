@@ -3,7 +3,7 @@ package com.education.outcome.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.education.entity.LearningPathStep;
-import com.education.outcome.mapper.LearningPathStepMapper;
+import com.education.path.mapper.LearningPathStepMapper;
 import com.education.outcome.service.LearningPathStepService;
 import org.springframework.stereotype.Service;
 
