@@ -16,8 +16,14 @@ const periodOptions = [
 ]
 
 // 评估报告数据（从后端获取）
+// 后端 /assessment/report 返回 List，/assessment/report/generate 返回单个对象
 const reportData = computed(() => {
-  const data = assessmentStore.assessmentReport
+  let data = assessmentStore.assessmentReport
+  if (!data) return null
+  // 如果是数组，取第一条（最新的）
+  if (Array.isArray(data)) {
+    data = data.length > 0 ? data[0] : null
+  }
   if (!data) return null
   return {
     id: data.id,
@@ -35,9 +41,9 @@ const knowledgeList = computed(() => {
   return Object.entries(mastery).map(([name, score]) => ({ name, score })).sort((a, b) => a.score - b.score)
 })
 
-// 综合评分（知识点平均分）
+// 综合评分（知识点平均分，无数据时显示"--"而非0）
 const overallScore = computed(() => {
-  if (knowledgeList.value.length === 0) return 0
+  if (knowledgeList.value.length === 0) return null
   return Math.round(knowledgeList.value.reduce((sum, k) => sum + k.score, 0) / knowledgeList.value.length)
 })
 
@@ -99,7 +105,7 @@ onMounted(async () => {
         <!-- 综合评分 -->
         <div class="score-card">
           <div class="score-circle">
-            <span class="score-number">{{ overallScore }}</span>
+            <span class="score-number">{{ overallScore ?? '--' }}</span>
             <span class="score-label">综合评分</span>
           </div>
           <div class="score-meta">

@@ -48,7 +48,25 @@ public class AssessmentController {
             startDate = LocalDate.now().minusDays(7).format(fmt);
         }
 
-        return Result.success(evaluateService.getReport(getUserId(), startDate, endDate));
+        // 返回时解析 knowledgeMastery JSON 字符串为对象
+        java.util.List<com.education.entity.LearningEvaluate> reports = evaluateService.getReport(getUserId(), startDate, endDate);
+        java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (com.education.entity.LearningEvaluate e : reports) {
+            Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("id", e.getId());
+            map.put("evaluateContent", e.getEvaluateContent());
+            map.put("improveSuggest", e.getImproveSuggest());
+            try {
+                if (e.getKnowledgeMastery() != null) {
+                    map.put("knowledgeMastery", com.alibaba.fastjson2.JSON.parse(e.getKnowledgeMastery()));
+                }
+            } catch (Exception ex) {
+                map.put("knowledgeMastery", null);
+            }
+            map.put("createTime", e.getCreateTime());
+            result.add(map);
+        }
+        return Result.success(result);
     }
 
     /**
