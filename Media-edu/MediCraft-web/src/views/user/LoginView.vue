@@ -119,14 +119,6 @@ const goToRegister = () => {
             </el-form-item>
           </el-form>
 
-          <div class="default-account">
-            <p>演示账号（无需后端）</p>
-            <div class="account-info">
-              <span>用户名：<strong>admin</strong></span>
-              <span>密码：<strong>admin123</strong></span>
-            </div>
-          </div>
-
           <div class="form-footer">
             <span>还没有账号？</span>
             <el-link type="primary" @click="goToRegister">立即注册</el-link>
