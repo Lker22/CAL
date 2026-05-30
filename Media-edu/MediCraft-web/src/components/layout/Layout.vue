@@ -30,8 +30,7 @@ const menuItems = [
     children: [
       { index: '/profile/display', title: '我的画像' },
       { index: '/profile/build', title: '画像构建' },
-      { index: '/profile/query', title: '画像查询' },
-      { index: '/user/info', title: '个人信息' }
+      { index: '/profile/query', title: '画像查询' }
     ]
   },
   {

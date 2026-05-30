@@ -45,31 +45,43 @@ const goToRegister = () => {
 
 <template>
   <div class="login-page">
+    <!-- 装饰性浮动元素 -->
+    <div class="floating-shapes">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+      <div class="shape shape-4"></div>
+      <div class="shape shape-5"></div>
+    </div>
+
     <div class="login-container">
       <!-- 左侧品牌区 -->
       <div class="brand-section">
         <div class="brand-content">
-          <h1 class="brand-title">新时代大学生</h1>
-          <h2 class="brand-subtitle">AI学习辅助系统</h2>
+          <div class="brand-logo">
+            <span class="logo-icon">🎓</span>
+          </div>
+          <h1 class="brand-title">MediCraft</h1>
+          <h2 class="brand-subtitle">AI 智能学习平台</h2>
           <p class="brand-desc">
-            智能画像 · 个性化资源 · 学习路径规划 · AI辅导
+            基于多智能体协同的个性化学习系统
           </p>
           <div class="brand-features">
             <div class="feature-item">
-              <span class="feature-icon">🧠</span>
-              <span>AI智能学习画像</span>
+              <div class="feature-dot"></div>
+              <span>AI 智能学习画像构建</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">📚</span>
-              <span>多智能体资源生成</span>
+              <div class="feature-dot"></div>
+              <span>6大智能体协同生成资源</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">🗺️</span>
-              <span>个性化学习路径</span>
+              <div class="feature-dot"></div>
+              <span>个性化学习路径规划</span>
             </div>
             <div class="feature-item">
-              <span class="feature-icon">💡</span>
-              <span>智能答疑辅导</span>
+              <div class="feature-dot"></div>
+              <span>智能答疑与效果评估</span>
             </div>
           </div>
         </div>
@@ -78,8 +90,8 @@ const goToRegister = () => {
       <!-- 右侧登录表单 -->
       <div class="form-section">
         <div class="form-container">
-          <h3 class="form-title">欢迎回来</h3>
-          <p class="form-subtitle">请登录您的账号</p>
+          <h3 class="form-title">欢迎回来 👋</h3>
+          <p class="form-subtitle">登录你的账号，继续学习之旅</p>
 
           <el-form
             ref="loginFormRef"
@@ -114,7 +126,7 @@ const goToRegister = () => {
                 class="login-btn"
                 @click="handleLogin"
               >
-                登 录
+                {{ loading ? '登录中...' : '登 录' }}
               </el-button>
             </el-form-item>
           </el-form>
@@ -135,55 +147,144 @@ const goToRegister = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 浮动装饰元素 */
+.floating-shapes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+  animation: float 20s infinite ease-in-out;
+}
+
+.shape-1 {
+  width: 300px; height: 300px;
+  background: #409eff;
+  top: -100px; left: -50px;
+  animation-delay: 0s;
+}
+.shape-2 {
+  width: 200px; height: 200px;
+  background: #67c23a;
+  bottom: -60px; right: 10%;
+  animation-delay: -5s;
+}
+.shape-3 {
+  width: 150px; height: 150px;
+  background: #e6a23c;
+  top: 30%; right: -40px;
+  animation-delay: -10s;
+}
+.shape-4 {
+  width: 100px; height: 100px;
+  background: #f56c6c;
+  bottom: 20%; left: 5%;
+  animation-delay: -15s;
+}
+.shape-5 {
+  width: 180px; height: 180px;
+  background: #b37feb;
+  top: 10%; left: 40%;
+  animation-delay: -7s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -30px) scale(1.05); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(15px, 10px) scale(1.02); }
 }
 
 .login-container {
   display: flex;
-  width: 900px;
-  min-height: 580px;
-  border-radius: 16px;
+  width: 960px;
+  min-height: 600px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+  position: relative;
+  z-index: 1;
 }
 
+/* 左侧品牌区 */
 .brand-section {
   flex: 1;
-  background: linear-gradient(135deg, #1d1e2c 0%, #2d2e42 100%);
+  background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-section::before {
+  content: '';
+  position: absolute;
+  width: 400px; height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(64, 158, 255, 0.15), transparent);
+  top: -100px; right: -100px;
 }
 
 .brand-content {
   color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+.brand-logo {
+  margin-bottom: 24px;
+}
+
+.logo-icon {
+  font-size: 48px;
+  display: inline-block;
+  animation: pulse 3s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 .brand-title {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 36px;
+  font-weight: 800;
   margin: 0 0 8px;
+  background: linear-gradient(90deg, #fff, #409eff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .brand-subtitle {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 400;
-  color: #409eff;
-  margin: 0 0 16px;
+  color: #8b8fa8;
+  margin: 0 0 12px;
 }
 
 .brand-desc {
-  font-size: 14px;
-  color: #a0a4b8;
-  margin: 0 0 32px;
+  font-size: 13px;
+  color: #6b6f8a;
+  margin: 0 0 36px;
 }
 
 .brand-features {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .feature-item {
@@ -191,20 +292,30 @@ const goToRegister = () => {
   align-items: center;
   gap: 12px;
   font-size: 14px;
-  color: #d0d3e0;
+  color: #b0b4cc;
+  transition: color 0.3s;
 }
 
-.feature-icon {
-  font-size: 20px;
+.feature-item:hover {
+  color: #fff;
 }
 
+.feature-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #409eff;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.5);
+}
+
+/* 右侧表单区 */
 .form-section {
   flex: 1;
   background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 48px;
 }
 
 .form-container {
@@ -213,10 +324,10 @@ const goToRegister = () => {
 }
 
 .form-title {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 700;
   color: #1d1e2c;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 
 .form-subtitle {
@@ -229,42 +340,41 @@ const goToRegister = () => {
   margin-top: 20px;
 }
 
+.login-form :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s;
+}
+
+.login-form :deep(.el-input__wrapper:hover),
+.login-form :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.2);
+}
+
 .login-btn {
   width: 100%;
-  height: 44px;
+  height: 46px;
   font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #409eff, #667eea);
+  border: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.35);
+}
+
+.login-btn:active {
+  transform: translateY(0);
 }
 
 .form-footer {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 24px;
   font-size: 14px;
   color: #909399;
-}
-
-.default-account {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f0f7ff;
-  border-radius: 8px;
-  text-align: center;
-}
-
-.default-account p {
-  font-size: 12px;
-  color: #909399;
-  margin: 0 0 6px;
-}
-
-.account-info {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  font-size: 13px;
-  color: #606266;
-}
-
-.account-info strong {
-  color: #409eff;
 }
 </style>

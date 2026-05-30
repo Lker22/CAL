@@ -6,7 +6,6 @@ const RegisterView = () => import('@/views/user/RegisterView.vue')
 const ProfileBuildView = () => import('@/views/user/ProfileBuildView.vue')
 const ProfileDisplayView = () => import('@/views/user/ProfileDisplayView.vue')
 const ProfileQueryView = () => import('@/views/user/ProfileQueryView.vue')
-const UserInfoView = () => import('@/views/user/UserInfoView.vue')
 
 // AI多智能体资源生成模块
 const AgentListView = () => import('@/views/ai-resource/AgentListView.vue')
@@ -73,11 +72,6 @@ const router = createRouter({
           path: '/profile/query',
           name: 'profile-query',
           component: ProfileQueryView
-        },
-        {
-          path: '/user/info',
-          name: 'user-info',
-          component: UserInfoView
         },
 
         // AI多智能体资源生成模块
