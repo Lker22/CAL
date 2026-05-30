@@ -23,9 +23,15 @@ const radarData = computed(() => {
 })
 
 // 知识掌握分布（从 /assessment/result 的 knowledgeMastery 计算）
+const parseMastery = (raw) => {
+  if (!raw) return null
+  if (typeof raw === 'string') { try { return JSON.parse(raw) } catch { return null } }
+  return raw
+}
+
 const knowledgeGraph = computed(() => {
   const data = assessmentStore.assessmentResult
-  const mastery = data?.knowledgeMastery
+  const mastery = parseMastery(data?.knowledgeMastery)
   if (!mastery || typeof mastery !== 'object' || Object.keys(mastery).length === 0) {
     // 没有评估报告数据，从 stats 推算
     const stats = assessmentStore.learningStats
@@ -49,7 +55,7 @@ const knowledgeGraph = computed(() => {
 // 知识点详细列表（从 knowledgeMastery 展开）
 const knowledgeList = computed(() => {
   const data = assessmentStore.assessmentResult
-  const mastery = data?.knowledgeMastery
+  const mastery = parseMastery(data?.knowledgeMastery)
   if (!mastery || typeof mastery !== 'object' || Object.keys(mastery).length === 0) {
     return []
   }

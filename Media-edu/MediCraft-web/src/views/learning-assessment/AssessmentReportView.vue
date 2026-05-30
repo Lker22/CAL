@@ -15,21 +15,26 @@ const periodOptions = [
   { label: '近90天', value: 'quarter' }
 ]
 
-// 评估报告数据（从 /assessment/result 获取，knowledgeMastery 已被后端解析为对象）
+// 评估报告数据（从 /assessment/result 获取）
 const reportData = computed(() => {
-  // 优先用 assessmentResult（来自 /assessment/result，knowledgeMastery 已解析）
   let data = assessmentStore.assessmentResult || assessmentStore.assessmentReport
   if (!data) return null
-  // 如果是数组，取第一条（最新的）
   if (Array.isArray(data)) {
     data = data.length > 0 ? data[0] : null
   }
   if (!data) return null
+
+  // knowledgeMastery 可能是 JSON 字符串，需要解析为对象
+  let mastery = data.knowledgeMastery
+  if (typeof mastery === 'string' && mastery) {
+    try { mastery = JSON.parse(mastery) } catch (e) { mastery = null }
+  }
+
   return {
     id: data.id,
     evaluateContent: data.evaluateContent || '',
     improveSuggest: data.improveSuggest || '',
-    knowledgeMastery: data.knowledgeMastery || null,
+    knowledgeMastery: mastery,
     createTime: data.createTime || ''
   }
 })
