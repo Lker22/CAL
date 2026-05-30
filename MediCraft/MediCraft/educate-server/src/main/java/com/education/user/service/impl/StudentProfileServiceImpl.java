@@ -33,8 +33,16 @@ public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper,
      */
     @Override
     public void saveOrUpdateProfile(StudentProfile profile) {
-        Long userId = BaseContext.getCurrentId();
-        StudentProfile exist = getByUserId();
+        // 优先用profile上已有的userId（定时任务场景BaseContext为null）
+        Long userId = profile.getUserId();
+        if (userId == null) {
+            userId = BaseContext.getCurrentId();
+        }
+
+        // 查询该用户的已有画像
+        LambdaQueryWrapper<StudentProfile> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(StudentProfile::getUserId, userId);
+        StudentProfile exist = getOne(existWrapper);
 
         // 修复 JSON 字段：errorPronePoints 是 JSON 列，纯文本需包装为 JSON 数组
         sanitizeJsonFields(profile);
