@@ -71,6 +71,8 @@ onMounted(async () => {
   try {
     // 从/result获取最新报告（knowledgeMastery已正确解析）
     await assessmentStore.getAssessmentResult()
+    console.log('[AssessmentReport] assessmentResult:', assessmentStore.assessmentResult)
+    console.log('[AssessmentReport] knowledgeMastery:', assessmentStore.assessmentResult?.knowledgeMastery)
   } finally {
     loading.value = false
   }
