@@ -1,4 +1,4 @@
-package com.education.path.vo;
+package com.education.vo;
 
 import lombok.Data;
 
@@ -17,8 +17,9 @@ public class AdjustPathVO {
     private String adjustmentType;
 
     /**
-     * 调整原因(可选，前端自动生成)
+     * 调整原因
      */
+    @NotBlank(message = "调整原因不能为空")
     private String reason;
 
     /**

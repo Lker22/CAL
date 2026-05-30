@@ -1,6 +1,6 @@
 package com.education.path.service;
 
-import com.education.path.vo.*;
+import com.education.vo.*;
 import com.education.result.Result;
 
 /**

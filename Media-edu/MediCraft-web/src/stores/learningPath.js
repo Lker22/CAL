@@ -43,7 +43,17 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     pathLoading.value = true
     try {
       const response = await learningPathApi.getPaths(params)
-      paths.value = response.data
+      // response = {code:200, msg:"操作成功", data:{records:[...], total:N, ...}}
+      // axios拦截器已返回response.data, 所以response就是Result对象
+      // response.data 就是分页对象, response.data.records 才是数组
+      const pageData = response.data
+      if (pageData && Array.isArray(pageData.records)) {
+        paths.value = pageData.records
+      } else if (Array.isArray(pageData)) {
+        paths.value = pageData
+      } else {
+        paths.value = []
+      }
       return response
     } catch (error) {
       console.warn('[LearningPath] 获取路径列表失败:', error.message)
@@ -76,11 +86,9 @@ export const useLearningPathStore = defineStore('learningPath', () => {
   async function completeStep(stepId, data = {}) {
     try {
       const response = await learningPathApi.completeStep(stepId, data)
-      // 更新步骤状态
-      const stepIndex = currentSteps.value.findIndex(s => s.id === stepId)
-      if (stepIndex !== -1) {
-        currentSteps.value[stepIndex].status = 'completed'
-        currentSteps.value[stepIndex].completedAt = Date.now()
+      // 刷新当前路径详情以获取最新进度
+      if (currentPath.value && currentPath.value.id) {
+        await getPathDetail(currentPath.value.id)
       }
       return response
     } catch (error) {
@@ -95,7 +103,8 @@ export const useLearningPathStore = defineStore('learningPath', () => {
   async function getRecommendedResources(pathId) {
     try {
       const response = await learningPathApi.getRecommendedResources(pathId)
-      recommendedResources.value = response.data
+      // response = {code:200, data: [...资源列表]}
+      recommendedResources.value = Array.isArray(response.data) ? response.data : []
       return response
     } catch (error) {
       console.warn('[LearningPath] 获取推荐资源失败:', error.message)
@@ -110,11 +119,13 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     pathLoading.value = true
     try {
       const response = await learningPathApi.adjustPath(pathId, adjustData)
+      // response = {code:200, data: LearningPathDetailVO}
+      // response.data 就是 LearningPathDetailVO (含 title, steps 等字段)
       currentPath.value = response.data
-      currentSteps.value = response.data.steps || []
+      currentSteps.value = response.data?.steps || []
       return response
     } catch (error) {
-      console.warn('[LearningPath] 调整路径失败:', error.message)
+      console.error('[LearningPath] 调整路径失败:', error)
       throw error
     } finally {
       pathLoading.value = false

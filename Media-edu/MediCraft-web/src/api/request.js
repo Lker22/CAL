@@ -42,7 +42,7 @@ request.interceptors.response.use(
 
     // 如果响应状态码不是成功状态，进行错误处理
     if (res.code && res.code !== 200 && res.code !== 0) {
-      ElMessage.error(res.message || '请求失败')
+      ElMessage.error(res.msg || '请求失败')
 
       // 401: 未授权，跳转登录页
       if (res.code === 401) {
@@ -51,7 +51,7 @@ request.interceptors.response.use(
         router.push('/login')
       }
 
-      return Promise.reject(new Error(res.message || '请求失败'))
+      return Promise.reject(new Error(res.msg || '请求失败'))
     }
 
     return res
@@ -66,7 +66,16 @@ request.interceptors.response.use(
     // 处理HTTP错误
     if (error.response) {
       const { status } = error.response
+      const data = error.response.data || {}
+
       switch (status) {
+        case 400: {
+          // 400 Bad Request：Spring Boot 验证错误 / 参数错误
+          // 响应格式可能是 {message: "xxx"} 或 {msg: "xxx"} 或纯文本
+          const msg = data.message || data.msg || data.error || '请求参数错误'
+          ElMessage.error(msg)
+          break
+        }
         case 401:
           ElMessage.error('登录已过期，请重新登录')
           localStorage.removeItem('token')
@@ -77,13 +86,13 @@ request.interceptors.response.use(
           ElMessage.error('没有权限访问')
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          ElMessage.error(data.msg || data.message || '请求的资源不存在')
           break
         case 500:
-          ElMessage.error('服务器错误')
+          ElMessage.error(data.msg || data.message || '服务器错误')
           break
         default:
-          ElMessage.error(error.message || '请求失败')
+          ElMessage.error(data.msg || data.message || error.message || '请求失败')
       }
     } else {
       // 非HTTP错误（如取消请求、超时等），不显示全局错误提示

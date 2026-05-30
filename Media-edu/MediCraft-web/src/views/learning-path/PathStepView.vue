@@ -12,98 +12,29 @@ const learningPathStore = useLearningPathStore()
 const loading = ref(false)
 const pathId = route.params.id
 
-// 示例路径详情
-const pathDetail = ref({
-  id: pathId,
-  title: 'Python全栈开发学习路径',
-  status: 'inProgress',
-  progress: 65,
-  description: '从Python基础到Web全栈开发的完整学习路线'
-})
+const pathDetail = computed(() => learningPathStore.currentPath || {})
+const steps = computed(() => learningPathStore.currentSteps || [])
+const progress = computed(() => pathDetail.value?.progress || 0)
 
-// 示例步骤数据
-const steps = ref([
-  {
-    id: 1,
-    title: 'Python基础语法',
-    description: '学习变量、数据类型、控制流、函数等基础语法',
-    status: 'completed',
-    duration: '3天',
-    resources: ['Python基础文档', '语法练习题库'],
-    completedAt: '2024-01-12'
-  },
-  {
-    id: 2,
-    title: '面向对象编程',
-    description: '掌握类、对象、继承、多态等OOP概念',
-    status: 'completed',
-    duration: '4天',
-    resources: ['OOP思维导图', '实战案例'],
-    completedAt: '2024-01-16'
-  },
-  {
-    id: 3,
-    title: 'Web框架入门（Flask）',
-    description: '学习Flask框架，理解路由、模板、数据库操作',
-    status: 'inProgress',
-    duration: '5天',
-    resources: ['Flask入门文档', '项目实操案例'],
-    completedAt: null
-  },
-  {
-    id: 4,
-    title: '数据库设计与操作',
-    description: '学习MySQL数据库设计、SQL语法、ORM框架',
-    status: 'pending',
-    duration: '4天',
-    resources: ['数据库设计文档'],
-    completedAt: null
-  },
-  {
-    id: 5,
-    title: '前端基础（HTML/CSS/JS）',
-    description: '学习前端三剑客，构建用户界面',
-    status: 'pending',
-    duration: '5天',
-    resources: ['前端入门教程'],
-    completedAt: null
-  },
-  {
-    id: 6,
-    title: '前后端整合项目',
-    description: '完成一个完整的全栈项目实战',
-    status: 'pending',
-    duration: '7天',
-    resources: ['项目需求文档', '实操案例'],
-    completedAt: null
-  }
-])
-
-// 获取步骤状态配置
 const getStepStatus = (status) => {
   return STEP_STATUS[status] || STEP_STATUS.pending
 }
 
-// 完成步骤（打卡）
 const completeStep = async (step) => {
   try {
     await learningPathStore.completeStep(step.id, { duration: 120 })
-    step.status = 'completed'
-    step.completedAt = new Date().toISOString().split('T')[0]
     ElMessage.success('学习打卡成功！')
+    // 重新加载详情以刷新进度
+    await learningPathStore.getPathDetail(pathId)
   } catch (error) {
-    ElMessage.success('学习打卡成功！')
-    step.status = 'completed'
-    step.completedAt = new Date().toISOString().split('T')[0]
+    ElMessage.error('打卡失败，请重试')
   }
 }
 
-// 查看资源
 const viewResource = (resourceName) => {
   router.push('/resource/list')
 }
 
-// 返回
 const goBack = () => {
   router.push('/path/list')
 }
@@ -120,125 +51,278 @@ onMounted(async () => {
 
 <template>
   <div class="path-step-page">
-    <div class="page-header">
+    <!-- 顶部导航 -->
+    <div class="page-nav">
       <el-button text @click="goBack">
         <el-icon><ArrowLeft /></el-icon>
-        返回
+        返回路径列表
       </el-button>
     </div>
 
-    <!-- 路径信息 -->
-    <div class="path-info">
-      <h2>{{ pathDetail.title }}</h2>
-      <p>{{ pathDetail.description }}</p>
-      <div class="progress-section">
-        <el-progress :percentage="pathDetail.progress" :stroke-width="12" />
+    <!-- 路径概览卡片 -->
+    <div class="path-overview" v-if="pathDetail">
+      <div class="overview-left">
+        <h2>{{ pathDetail.title || pathDetail.pathName }}</h2>
+        <div class="overview-stats">
+          <div class="ov-stat">
+            <span class="ov-num">{{ steps.length }}</span>
+            <span class="ov-label">总步骤</span>
+          </div>
+          <div class="ov-divider"></div>
+          <div class="ov-stat">
+            <span class="ov-num green">{{ pathDetail.completedSteps || 0 }}</span>
+            <span class="ov-label">已完成</span>
+          </div>
+          <div class="ov-divider"></div>
+          <div class="ov-stat">
+            <span class="ov-num blue">{{ progress }}%</span>
+            <span class="ov-label">进度</span>
+          </div>
+        </div>
+      </div>
+      <div class="overview-right">
+        <el-progress
+          type="dashboard"
+          :percentage="progress"
+          :width="100"
+          :stroke-width="8"
+          color="#409eff"
+        >
+          <template #default="{ percentage }">
+            <span class="progress-inner">{{ percentage }}%</span>
+          </template>
+        </el-progress>
       </div>
     </div>
 
     <!-- 步骤时间线 -->
-    <div class="steps-timeline">
-      <el-timeline>
-        <el-timeline-item
-          v-for="step in steps"
-          :key="step.id"
-          :type="getStepStatus(step.status).color"
-          :hollow="step.status === 'pending'"
-          :timestamp="step.completedAt || `预计 ${step.duration}`"
-          placement="top"
-        >
-          <el-card shadow="hover" class="step-card">
-            <div class="step-header">
-              <div class="step-title-area">
-                <h4>{{ step.title }}</h4>
-                <el-tag
-                  :color="getStepStatus(step.status).color"
-                  effect="dark"
-                  size="small"
-                >
-                  {{ getStepStatus(step.status).label }}
-                </el-tag>
+    <div class="steps-section" v-loading="loading">
+      <div class="section-header">
+        <h3>学习步骤</h3>
+        <el-button size="small" @click="$router.push('/path/adjust')">
+          调整路径
+        </el-button>
+      </div>
+
+      <div class="steps-timeline">
+        <el-timeline>
+          <el-timeline-item
+            v-for="(step, index) in steps"
+            :key="step.id"
+            :type="getStepStatus(step.status).color"
+            :hollow="step.status === 'pending'"
+            placement="top"
+          >
+            <div class="step-card" :class="step.status">
+              <div class="step-number">{{ index + 1 }}</div>
+              <div class="step-content">
+                <div class="step-header">
+                  <div class="step-title-area">
+                    <h4>{{ step.title }}</h4>
+                    <el-tag
+                      :color="getStepStatus(step.status).color"
+                      effect="dark"
+                      size="small"
+                    >
+                      {{ getStepStatus(step.status).label }}
+                    </el-tag>
+                  </div>
+                  <div class="step-right">
+                    <span class="step-time" v-if="step.completedAt">
+                      {{ step.completedAt }} 完成
+                    </span>
+                    <span class="step-time" v-else>
+                      预计 {{ step.duration || '3-5天' }}
+                    </span>
+                    <el-button
+                      v-if="step.status === 'inProgress'"
+                      type="success"
+                      size="small"
+                      @click="completeStep(step)"
+                    >
+                      打卡完成
+                    </el-button>
+                  </div>
+                </div>
+
+                <p class="step-desc">{{ step.description }}</p>
+
+                <div class="step-resources" v-if="step.resources && step.resources.length">
+                  <span class="resource-label">相关资源：</span>
+                  <el-tag
+                    v-for="(res, index) in step.resources"
+                    :key="index"
+                    size="small"
+                    type="info"
+                    effect="plain"
+                    class="resource-tag"
+                    @click="viewResource(res)"
+                  >
+                    {{ res }}
+                  </el-tag>
+                </div>
               </div>
-              <el-button
-                v-if="step.status === 'inProgress'"
-                type="success"
-                size="small"
-                @click="completeStep(step)"
-              >
-                打卡完成
-              </el-button>
             </div>
+          </el-timeline-item>
+        </el-timeline>
+      </div>
+    </div>
 
-            <p class="step-desc">{{ step.description }}</p>
-
-            <div class="step-resources">
-              <span class="resource-label">相关资源：</span>
-              <el-tag
-                v-for="(res, index) in step.resources"
-                :key="index"
-                size="small"
-                type="info"
-                effect="plain"
-                class="resource-tag"
-                @click="viewResource(res)"
-              >
-                {{ res }}
-              </el-tag>
-            </div>
-          </el-card>
-        </el-timeline-item>
-      </el-timeline>
+    <!-- 底部操作栏 -->
+    <div class="bottom-actions">
+      <el-button @click="$router.push('/path/adjust')">调整路径</el-button>
+      <el-button @click="$router.push('/recommend/resource')">查看推荐资源</el-button>
     </div>
   </div>
 </template>
 
 <script>
 import { ArrowLeft } from '@element-plus/icons-vue'
-export default {
-  components: { ArrowLeft }
-}
+export default { components: { ArrowLeft } }
 </script>
 
 <style scoped>
 .path-step-page {
-  padding: 0;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 0;
 }
 
-.page-header {
+.page-nav {
   margin-bottom: 16px;
 }
 
-.path-info {
+/* 路径概览卡片 */
+.path-overview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  color: #fff;
+}
+
+.overview-left h2 {
+  font-size: 22px;
+  margin: 0 0 16px;
+  color: #fff;
+}
+
+.overview-stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.ov-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ov-num {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ov-num.green { color: #a5f5a5; }
+.ov-num.blue { color: #a5d8ff; }
+
+.ov-label {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.ov-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255,255,255,0.3);
+}
+
+.overview-right :deep(.el-progress-circle) path:first-child {
+  stroke: rgba(255,255,255,0.2);
+}
+
+.progress-inner {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 步骤区域 */
+.steps-section {
   background: #fff;
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: 16px;
+  padding: 24px 28px;
+  border: 1px solid #f0f0f0;
   margin-bottom: 24px;
 }
 
-.path-info h2 {
-  font-size: 20px;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h3 {
+  font-size: 17px;
   color: #1d1e2c;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
-.path-info p {
-  font-size: 14px;
-  color: #909399;
-  margin: 0 0 16px;
-}
-
-.progress-section {
-  max-width: 500px;
-}
-
-.steps-timeline {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-}
-
+/* 步骤卡片 */
 .step-card {
-  margin-bottom: 8px;
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s;
+  margin-bottom: 4px;
+}
+
+.step-card:hover {
+  background: #f0f7ff;
+  border-color: #c6e2ff;
+}
+
+.step-card.completed {
+  background: #f0f9eb;
+  border-color: #e1f3d8;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  text-align: center;
+  border-radius: 50%;
+  background: #e4e7ed;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-card.inProgress .step-number {
+  background: #409eff;
+  color: #fff;
+}
+
+.step-card.completed .step-number {
+  background: #67c23a;
+  color: #fff;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .step-header {
@@ -251,19 +335,30 @@ export default {
 .step-title-area {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .step-title-area h4 {
-  font-size: 16px;
+  font-size: 15px;
   color: #1d1e2c;
   margin: 0;
 }
 
+.step-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.step-time {
+  font-size: 12px;
+  color: #909399;
+}
+
 .step-desc {
-  font-size: 14px;
+  font-size: 13px;
   color: #606266;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   line-height: 1.6;
 }
 
@@ -275,7 +370,7 @@ export default {
 }
 
 .resource-label {
-  font-size: 13px;
+  font-size: 12px;
   color: #909399;
 }
 
@@ -287,5 +382,12 @@ export default {
 .resource-tag:hover {
   color: #409eff;
   border-color: #409eff;
+}
+
+/* 底部操作 */
+.bottom-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
 }
 </style>

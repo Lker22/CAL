@@ -14,7 +14,9 @@ public class AiConfig {
     @Value("${spring.ai.dashscope.api-key}")
     private String apiKey;
 
-    @Value("${spring.ai.dashscope.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}")
+//    @Value("${spring.ai.dashscope.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}")
+//    private String baseUrl;
+    @Value("${spring.ai.dashscope.base-url: https://token-plan-cn.xiaomimimo.com/v1}")
     private String baseUrl;
 
     @Value("${spring.ai.dashscope.chat.model:qwen-plus}")

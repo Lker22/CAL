@@ -15,7 +15,7 @@ import com.education.path.mapper.LearningBehaviorMapper;
 import com.education.path.mapper.LearningPathMapper;
 import com.education.path.mapper.LearningPathStepMapper;
 import com.education.path.service.LearningPathService;
-import com.education.path.vo.*;
+import com.education.vo.*;
 import com.education.result.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
