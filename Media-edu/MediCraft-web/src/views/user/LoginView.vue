@@ -58,9 +58,6 @@ const goToRegister = () => {
       <!-- 左侧品牌区 -->
       <div class="brand-section">
         <div class="brand-content">
-          <div class="brand-logo">
-            <span class="logo-icon">🎓</span>
-          </div>
           <h1 class="brand-title">MediCraft</h1>
           <h2 class="brand-subtitle">AI 智能学习平台</h2>
           <p class="brand-desc">

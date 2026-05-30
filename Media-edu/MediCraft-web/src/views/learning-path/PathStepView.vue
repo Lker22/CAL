@@ -78,6 +78,11 @@ onMounted(async () => {
             <span class="ov-num blue">{{ progress }}%</span>
             <span class="ov-label">进度</span>
           </div>
+          <div class="ov-divider"></div>
+          <div class="ov-stat">
+            <span class="ov-num orange">{{ pathDetail.duration || '未设置' }}</span>
+            <span class="ov-label">学习周期</span>
+          </div>
         </div>
       </div>
       <div class="overview-right">
@@ -230,6 +235,7 @@ export default { components: { ArrowLeft } }
 
 .ov-num.green { color: #a5f5a5; }
 .ov-num.blue { color: #a5d8ff; }
+.ov-num.orange { color: #ffd591; }
 
 .ov-label {
   font-size: 12px;
