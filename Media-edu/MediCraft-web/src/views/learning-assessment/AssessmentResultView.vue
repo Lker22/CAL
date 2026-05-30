@@ -45,11 +45,23 @@ const knowledgeGraph = computed(() => {
   }
   // knowledgeMastery 是 { "MySQL": 75, "Java": 60 } 形式
   const values = Object.values(mastery)
-  const avg = values.reduce((a, b) => a + b, 0) / values.length
-  const mastered = Math.round(values.filter(v => v >= 80).length / values.length * 100)
-  const learning = Math.round(values.filter(v => v >= 40 && v < 80).length / values.length * 100)
-  const pending = 100 - mastered - learning
-  return { mastered, learning, pending: Math.max(0, pending) }
+  const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+  // 按分数段分类：>=70已掌握，40-70学习中，<40待学习
+  // 如果所有分数都很低（都<40），按相对高低分配：前1/3已掌握，中1/3学习中，后1/3待学习
+  let mastered, learning, pending
+  const hasHigh = values.some(v => v >= 70)
+  const hasMid = values.some(v => v >= 40 && v < 70)
+  if (hasHigh || hasMid) {
+    mastered = Math.round(values.filter(v => v >= 70).length / values.length * 100)
+    learning = Math.round(values.filter(v => v >= 40 && v < 70).length / values.length * 100)
+    pending = 100 - mastered - learning
+  } else {
+    // 全部低分，按平均分显示
+    mastered = 0
+    learning = Math.min(100, avg * 2) // 平均分25→50%学习中
+    pending = 100 - learning
+  }
+  return { mastered, learning, pending: Math.max(0, pending), avg }
 })
 
 // 知识点详细列表（从 knowledgeMastery 展开）
