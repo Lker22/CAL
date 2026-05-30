@@ -1,54 +1,83 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment'
+import { assessmentApi } from '@/api/assessment'
 import { CircleCheck, EditPen, VideoCamera } from '@element-plus/icons-vue'
 
 const assessmentStore = useAssessmentStore()
-
 const loading = ref(false)
+const weakPointsData = ref(null)
+const trendData = ref([])
 
-// 默认空结果
-const emptyResult = {
-  knowledgeGraph: { mastered: 0, learning: 0, pending: 100 },
-  trendData: [],
-  weakPoints: [],
-  recentActivity: []
-}
-
-// 优先使用 store 中的后端数据
-const result = computed(() => {
-  const data = assessmentStore.assessmentResult
-  if (!data) return emptyResult
-  return {
-    knowledgeGraph: data.knowledgeGraph || emptyResult.knowledgeGraph,
-    trendData: data.trendData || [],
-    weakPoints: data.weakPoints || [],
-    recentActivity: data.recentActivity || []
-  }
+// 雷达图数据（从 /assessment/stats 获取）
+const radarData = computed(() => {
+  const stats = assessmentStore.learningStats
+  if (!stats) return null
+  return [
+    { name: '知识掌握', value: stats.masteryScore || 0 },
+    { name: '技能应用', value: stats.applicationScore || 0 },
+    { name: '学习进度', value: stats.progressScore || 0 },
+    { name: '练习正确率', value: stats.accuracyScore || 0 },
+    { name: '学习持续性', value: stats.consistencyScore || 0 }
+  ]
 })
 
-// 雷达图数据（从评估结果或统计数据中提取）
-const radarData = computed(() => {
+// 知识掌握分布（从 /assessment/result 的 knowledgeMastery 计算）
+const knowledgeGraph = computed(() => {
   const data = assessmentStore.assessmentResult
-  if (data?.radarData) return data.radarData
-  // 从统计数据中构建雷达图
-  const stats = assessmentStore.learningStats
-  if (stats) {
-    return [
-      { name: '知识掌握', value: stats.masteryScore || 0 },
-      { name: '技能应用', value: stats.applicationScore || 0 },
-      { name: '学习进度', value: stats.progressScore || 0 },
-      { name: '练习正确率', value: stats.accuracyScore || 0 },
-      { name: '学习持续性', value: stats.consistencyScore || 0 }
-    ]
+  const mastery = data?.knowledgeMastery
+  if (!mastery || typeof mastery !== 'object' || Object.keys(mastery).length === 0) {
+    // 没有评估报告数据，从 stats 推算
+    const stats = assessmentStore.learningStats
+    if (stats && (stats.totalTime > 0 || stats.totalQuiz > 0)) {
+      const avgMastery = Math.round(
+        ((stats.masteryScore || 0) + (stats.accuracyScore || 0) + (stats.progressScore || 0)) / 3
+      )
+      return { mastered: avgMastery, learning: Math.max(0, 100 - avgMastery), pending: 0 }
+    }
+    return { mastered: 0, learning: 0, pending: 100 }
   }
-  return [
-    { name: '知识掌握', value: 0 },
-    { name: '技能应用', value: 0 },
-    { name: '学习进度', value: 0 },
-    { name: '练习正确率', value: 0 },
-    { name: '学习持续性', value: 0 }
-  ]
+  // knowledgeMastery 是 { "MySQL": 75, "Java": 60 } 形式
+  const values = Object.values(mastery)
+  const avg = values.reduce((a, b) => a + b, 0) / values.length
+  const mastered = Math.round(values.filter(v => v >= 80).length / values.length * 100)
+  const learning = Math.round(values.filter(v => v >= 40 && v < 80).length / values.length * 100)
+  const pending = 100 - mastered - learning
+  return { mastered, learning, pending: Math.max(0, pending) }
+})
+
+// 知识点详细列表（从 knowledgeMastery 展开）
+const knowledgeList = computed(() => {
+  const data = assessmentStore.assessmentResult
+  const mastery = data?.knowledgeMastery
+  if (!mastery || typeof mastery !== 'object' || Object.keys(mastery).length === 0) {
+    return []
+  }
+  return Object.entries(mastery).map(([name, score]) => ({
+    name,
+    mastery: score
+  })).sort((a, b) => a.mastery - b.mastery)
+})
+
+// 薄弱点列表（掌握度低于60的知识点）
+const weakPoints = computed(() => {
+  return knowledgeList.value.filter(p => p.mastery < 60)
+})
+
+// 最近学习活动（从 /assessment/stats 的 behaviorByType 推算）
+const recentActivity = computed(() => {
+  const stats = assessmentStore.learningStats
+  if (!stats) return []
+  const activities = []
+  const behaviorByType = stats.behaviorByType || {}
+  for (const [type, count] of Object.entries(behaviorByType)) {
+    activities.push({
+      type: type === '完成' ? 'completed' : type === '做题' ? 'quiz' : 'study',
+      title: `${type} ${count} 次`,
+      date: stats.endDate || ''
+    })
+  }
+  return activities
 })
 
 onMounted(async () => {
@@ -58,6 +87,11 @@ onMounted(async () => {
       assessmentStore.getAssessmentResult(),
       assessmentStore.getLearningStats()
     ])
+    // 额外获取薄弱点
+    try {
+      const wp = await assessmentApi.getWeakPoints()
+      weakPointsData.value = wp.data
+    } catch (e) { /* 无数据不报错 */ }
   } catch (error) {
     console.warn('获取评估结果失败:', error.message)
   } finally {
@@ -77,106 +111,110 @@ onMounted(async () => {
       <!-- 知识掌握分布 -->
       <div class="knowledge-card">
         <h4>知识掌握分布</h4>
-        <div class="knowledge-chart">
+        <div v-if="knowledgeGraph.mastered > 0 || knowledgeGraph.learning > 0" class="knowledge-chart">
           <el-progress
             type="dashboard"
-            :percentage="result.knowledgeGraph.mastered"
+            :percentage="knowledgeGraph.mastered"
             :color="() => '#67C23A'"
             :format="(p) => `${p}% 已掌握`"
           />
           <div class="knowledge-legend">
             <div class="legend-item">
               <span class="legend-dot mastered" />
-              <span>已掌握 {{ result.knowledgeGraph.mastered }}%</span>
+              <span>已掌握 {{ knowledgeGraph.mastered }}%</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot learning" />
-              <span>学习中 {{ result.knowledgeGraph.learning }}%</span>
+              <span>学习中 {{ knowledgeGraph.learning }}%</span>
             </div>
             <div class="legend-item">
               <span class="legend-dot pending" />
-              <span>待学习 {{ result.knowledgeGraph.pending }}%</span>
+              <span>待学习 {{ knowledgeGraph.pending }}%</span>
             </div>
           </div>
         </div>
+        <div v-else class="empty-tip">
+          <p>暂无知识掌握数据，完成学习路径生成评估报告后可查看</p>
+        </div>
       </div>
 
-      <!-- 学习趋势图 -->
-      <div class="trend-card">
-        <h4>学习趋势</h4>
-        <div class="trend-chart">
-          <div class="trend-bars">
-            <div
-              v-for="(item, index) in result.trendData"
-              :key="index"
-              class="trend-bar"
-              :style="{ height: `${(item.score / 100) * 150}px` }"
-            >
-              <span class="bar-value">{{ item.score }}</span>
-            </div>
+      <!-- 知识点详细列表 -->
+      <div class="knowledge-detail-card">
+        <h4>知识点掌握详情</h4>
+        <div v-if="knowledgeList.length > 0" class="knowledge-list">
+          <div
+            v-for="(item, index) in knowledgeList"
+            :key="index"
+            class="knowledge-item"
+          >
+            <span class="knowledge-name">{{ item.name }}</span>
+            <el-progress
+              :percentage="item.mastery"
+              :color="(p) => p >= 80 ? '#67C23A' : p >= 60 ? '#E6A23C' : '#F56C6C'"
+              :show-text="false"
+            />
+            <span class="knowledge-score">{{ item.mastery }}%</span>
           </div>
-          <div class="trend-dates">
-            <span
-              v-for="(item, index) in result.trendData"
-              :key="index"
-              class="date-label"
-            >
-              {{ item.date }}
-            </span>
-          </div>
+        </div>
+        <div v-else class="empty-tip">
+          <p>暂无知识点数据，生成评估报告后可查看详细掌握度</p>
         </div>
       </div>
 
       <!-- 薄弱点分析 -->
       <div class="weakpoints-card">
         <h4>薄弱知识点</h4>
-        <div class="weakpoints-list">
+        <div v-if="weakPoints.length > 0" class="weakpoints-list">
           <div
-            v-for="(point, index) in result.weakPoints"
+            v-for="(point, index) in weakPoints"
             :key="index"
             class="weakpoint-item"
           >
             <span class="weakpoint-name">{{ point.name }}</span>
             <el-progress
               :percentage="point.mastery"
-              :color="(p) => p < 60 ? '#F56C6C' : '#E6A23C'"
+              :color="(p) => p < 40 ? '#F56C6C' : '#E6A23C'"
               :show-text="false"
             />
             <span class="weakpoint-score">{{ point.mastery }}%</span>
           </div>
+        </div>
+        <div v-else class="empty-tip">
+          <p>暂无薄弱知识点（掌握度低于60%的知识点会显示在这里）</p>
         </div>
       </div>
 
       <!-- 雷达图 -->
       <div class="radar-card">
         <h4>能力雷达图</h4>
-        <div class="radar-chart">
-          <div class="radar-placeholder">
-            <div class="radar-point" style="top: 20%; left: 50%;">
-              <span>{{ radarData[0]?.value }}</span>
-            </div>
-            <div class="radar-point" style="top: 40%; left: 80%;">
-              <span>{{ radarData[1]?.value }}</span>
-            </div>
-            <div class="radar-point" style="top: 70%; left: 70%;">
-              <span>{{ radarData[2]?.value }}</span>
-            </div>
-            <div class="radar-point" style="top: 70%; left: 30%;">
-              <span>{{ radarData[3]?.value }}</span>
-            </div>
-            <div class="radar-point" style="top: 40%; left: 20%;">
-              <span>{{ radarData[4]?.value }}</span>
+        <div v-if="radarData && radarData.some(d => d.value > 0)" class="radar-chart">
+          <div class="radar-axis">
+            <div
+              v-for="(item, index) in radarData"
+              :key="index"
+              class="radar-item"
+            >
+              <span class="radar-label">{{ item.name }}</span>
+              <el-progress
+                :percentage="item.value"
+                :color="() => '#409EFF'"
+                :stroke-width="8"
+                :show-text="true"
+              />
             </div>
           </div>
+        </div>
+        <div v-else class="empty-tip">
+          <p>暂无能力数据，完成学习和练习后可生成能力评估</p>
         </div>
       </div>
 
       <!-- 最近活动 -->
       <div class="activity-card">
         <h4>最近学习活动</h4>
-        <div class="activity-list">
+        <div v-if="recentActivity.length > 0" class="activity-list">
           <div
-            v-for="(activity, index) in result.recentActivity"
+            v-for="(activity, index) in recentActivity"
             :key="index"
             class="activity-item"
           >
@@ -196,11 +234,12 @@ onMounted(async () => {
             </el-icon>
             <div class="activity-info">
               <span class="activity-title">{{ activity.title }}</span>
-              <span v-if="activity.score" class="activity-score">得分：{{ activity.score }}%</span>
-              <span v-if="activity.duration" class="activity-score">时长：{{ activity.duration }}分钟</span>
             </div>
             <span class="activity-date">{{ activity.date }}</span>
           </div>
+        </div>
+        <div v-else class="empty-tip">
+          <p>暂无学习活动记录，完成学习路径打卡或练习后可查看</p>
         </div>
       </div>
     </div>
@@ -235,6 +274,7 @@ onMounted(async () => {
 }
 
 .knowledge-card,
+.knowledge-detail-card,
 .trend-card,
 .weakpoints-card,
 .radar-card,
@@ -245,6 +285,7 @@ onMounted(async () => {
 }
 
 .knowledge-card h4,
+.knowledge-detail-card h4,
 .trend-card h4,
 .weakpoints-card h4,
 .radar-card h4,
@@ -252,6 +293,13 @@ onMounted(async () => {
   font-size: 16px;
   color: #1d1e2c;
   margin: 0 0 20px;
+}
+
+.empty-tip {
+  text-align: center;
+  padding: 20px 0;
+  color: #909399;
+  font-size: 14px;
 }
 
 .knowledge-chart {
@@ -280,57 +328,40 @@ onMounted(async () => {
   border-radius: 50%;
 }
 
-.legend-dot.mastered {
-  background: #67c23a;
-}
+.legend-dot.mastered { background: #67c23a; }
+.legend-dot.learning { background: #409eff; }
+.legend-dot.pending { background: #909399; }
 
-.legend-dot.learning {
-  background: #409eff;
-}
-
-.legend-dot.pending {
-  background: #909399;
-}
-
-.trend-chart {
-  text-align: center;
-}
-
-.trend-bars {
+.knowledge-list {
   display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-  height: 150px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #e4e7ed;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.trend-bar {
-  width: 32px;
-  background: linear-gradient(to top, #409eff, #67c23a);
-  border-radius: 4px 4px 0 0;
+.knowledge-item {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 4px;
+  align-items: center;
+  gap: 12px;
 }
 
-.bar-value {
-  font-size: 12px;
-  color: #fff;
+.knowledge-name {
+  width: 80px;
+  font-size: 14px;
+  color: #606266;
+  flex-shrink: 0;
+}
+
+.knowledge-item :deep(.el-progress) {
+  flex: 1;
+}
+
+.knowledge-score {
+  width: 45px;
+  font-size: 14px;
   font-weight: 600;
-}
-
-.trend-dates {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 8px;
-}
-
-.date-label {
-  width: 40px;
-  font-size: 12px;
-  color: #909399;
+  color: #1d1e2c;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .weakpoints-list {
@@ -359,39 +390,32 @@ onMounted(async () => {
   width: 45px;
   font-size: 14px;
   font-weight: 600;
-  color: #1d1e2c;
+  color: #F56C6C;
   text-align: right;
 }
 
-.radar-chart {
+.radar-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.radar-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 200px;
+  gap: 12px;
 }
 
-.radar-placeholder {
-  position: relative;
-  width: 200px;
-  height: 200px;
+.radar-label {
+  width: 80px;
+  font-size: 13px;
+  color: #606266;
+  flex-shrink: 0;
 }
 
-.radar-point {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  background: #409eff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: translate(-50%, -50%);
-}
-
-.radar-point span {
-  font-size: 11px;
-  color: #fff;
-  font-weight: 600;
+.radar-item :deep(.el-progress) {
+  flex: 1;
 }
 
 .activity-list {
@@ -415,11 +439,6 @@ onMounted(async () => {
 .activity-title {
   font-size: 14px;
   color: #303133;
-}
-
-.activity-score {
-  font-size: 12px;
-  color: #909399;
 }
 
 .activity-date {

@@ -96,13 +96,13 @@ public class AssessmentController {
         result.put("id", evaluate.getId());
         result.put("evaluateContent", evaluate.getEvaluateContent());
         result.put("improveSuggest", evaluate.getImproveSuggest());
-        // knowledgeMastery 是 JSON 字符串，转为 knowledgeGraph
+        // knowledgeMastery 是 JSON 字符串，解析为对象
         try {
             if (evaluate.getKnowledgeMastery() != null) {
-                result.put("knowledgeGraph", com.alibaba.fastjson2.JSON.parse(evaluate.getKnowledgeMastery()));
+                result.put("knowledgeMastery", com.alibaba.fastjson2.JSON.parse(evaluate.getKnowledgeMastery()));
             }
         } catch (Exception e) {
-            result.put("knowledgeGraph", null);
+            result.put("knowledgeMastery", null);
         }
         result.put("createTime", evaluate.getCreateTime());
         return Result.success(result);
