@@ -65,7 +65,7 @@ export const learningPathApi = {
   },
 
   /**
-   * 动态调整学习路径
+   * 动态调整学习路径（AI调用较慢，延长超时到120秒）
    * @param {Number} pathId - 路径ID
    * @param {Object} data - { adjustmentType, params }
    */
@@ -73,7 +73,8 @@ export const learningPathApi = {
     return request({
       url: `/learning-path/${pathId}/adjust`,
       method: 'put',
-      data
+      data,
+      timeout: 120000
     })
   },
 

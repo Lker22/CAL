@@ -73,6 +73,10 @@ public class LearningPathServiceImpl implements LearningPathService {
         path.setTotalStep(steps.size());
         path.setCurrentStep(0);
         path.setStatus("doing");
+        // 保存学习周期
+        if (vo.getDuration() != null) {
+            path.setDuration(mapDurationLabel(vo.getDuration()));
+        }
         pathMapper.insert(path);
 
         // 3. 批量保存步骤(数据库finish_status为0=未完成)
@@ -270,7 +274,7 @@ public class LearningPathServiceImpl implements LearningPathService {
             vo.setStatus("pending");
         }
 
-        vo.setDuration(path.getTotalStep() + "个步骤");
+        vo.setDuration(path.getDuration() != null ? path.getDuration() : path.getTotalStep() + "个步骤");
 
         List<LearningPathStepVO> stepVOs = convertToStepVOs(steps);
         vo.setSteps(stepVOs);
@@ -419,57 +423,34 @@ public class LearningPathServiceImpl implements LearningPathService {
             }
         }
 
-        // 2. 查询资源：优先关联的，没有则查用户所有资源
-        List<LearningResource> resources;
-        if (!linkedResourceIds.isEmpty()) {
-            LambdaQueryWrapper<LearningResource> wrapper = new LambdaQueryWrapper<>();
-            wrapper.in(LearningResource::getId, linkedResourceIds);
-            resources = resourceMapper.selectList(wrapper);
-        } else {
-            // 查用户所有资源，按时间倒序
-            LambdaQueryWrapper<LearningResource> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(LearningResource::getUserId, userId)
-                    .orderByDesc(LearningResource::getCreateTime)
-                    .last("LIMIT 10");
-            resources = resourceMapper.selectList(wrapper);
-        }
+        // 2. 查询用户所有资源
+        LambdaQueryWrapper<LearningResource> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LearningResource::getUserId, userId)
+                .orderByDesc(LearningResource::getCreateTime);
+        List<LearningResource> allResources = resourceMapper.selectList(wrapper);
 
-        // 3. 构建推荐VO，计算匹配度和推荐理由
+        // 3. 按主题相关性过滤+评分，只保留与路径主题相关的资源
+        String topic = path.getPathName();
         List<RecommendedResourceVO> voList = new ArrayList<>();
-        for (LearningResource res : resources) {
+        for (LearningResource res : allResources) {
+            int score = calculateMatchScore(res, path, linkedResourceIds.contains(res.getId()), topic);
+            if (score < 30) continue; // 过滤不相关的资源
             RecommendedResourceVO vo = new RecommendedResourceVO();
             vo.setId(res.getId());
             vo.setTitle(res.getResourceTitle());
             vo.setType(mapResourceType(res.getResourceType()));
-            vo.setMatchScore(calculateMatchScore(res, path, linkedResourceIds.contains(res.getId())));
-            vo.setReason(generateRecommendReason(res, path, linkedResourceIds.contains(res.getId())));
+            vo.setMatchScore(score);
+            vo.setReason(generateRecommendReason(res, path, linkedResourceIds.contains(res.getId()), topic));
             vo.setPathName(path.getPathName());
             voList.add(vo);
         }
 
-        // 如果资源不足5条，从用户的其他资源中补充
-        if (voList.size() < 5) {
-            Set<Long> existingIds = resources.stream().map(LearningResource::getId).collect(java.util.stream.Collectors.toSet());
-            LambdaQueryWrapper<LearningResource> extraWrapper = new LambdaQueryWrapper<>();
-            extraWrapper.eq(LearningResource::getUserId, userId)
-                    .notIn(!existingIds.isEmpty(), LearningResource::getId, existingIds)
-                    .orderByDesc(LearningResource::getCreateTime)
-                    .last("LIMIT " + (5 - voList.size()));
-            List<LearningResource> extraResources = resourceMapper.selectList(extraWrapper);
-            for (LearningResource res : extraResources) {
-                RecommendedResourceVO vo = new RecommendedResourceVO();
-                vo.setId(res.getId());
-                vo.setTitle(res.getResourceTitle());
-                vo.setType(mapResourceType(res.getResourceType()));
-                vo.setMatchScore(65); // 基础匹配度
-                vo.setReason("根据你的学习路径推荐");
-                vo.setPathName(path.getPathName());
-                voList.add(vo);
-            }
+        // 按匹配度降序排列，取前10条
+        voList.sort((a, b) -> b.getMatchScore() - a.getMatchScore());
+        if (voList.size() > 10) {
+            voList = voList.subList(0, 10);
         }
 
-        // 按匹配度降序排列
-        voList.sort((a, b) -> b.getMatchScore() - a.getMatchScore());
         return Result.success(voList);
     }
 
@@ -484,27 +465,87 @@ public class LearningPathServiceImpl implements LearningPathService {
         };
     }
 
-    private int calculateMatchScore(LearningResource resource, LearningPath path, boolean isLinked) {
-        int score = 60;
-        // 关联了路径步骤的资源加分
-        if (isLinked) score += 25;
-        // 有知识点标签加分
-        if (resource.getKnowledgePoint() != null) score += 8;
-        // 有难度标签加分
-        if (resource.getDifficulty() != null) score += 5;
-        // 微调
-        score += new Random().nextInt(6);
-        return Math.min(score, 99);
+    /**
+     * 将前端传的duration数字转为中文描述
+     */
+    private String mapDurationLabel(String duration) {
+        if (duration == null || duration.isEmpty()) return null;
+        return switch (duration) {
+            case "2" -> "2周";
+            case "4" -> "1个月";
+            case "8" -> "2个月";
+            case "12" -> "3个月";
+            default -> duration + "周";
+        };
     }
 
-    private String generateRecommendReason(LearningResource resource, LearningPath path, boolean isLinked) {
+    /**
+     * 计算资源与路径主题的匹配度
+     * 评分规则：
+     * - 关联了路径步骤: +25
+     * - 标题包含主题关键词: +20
+     * - 知识点包含主题关键词: +20
+     * - 有知识点标签: +5
+     * - 有难度标签: +3
+     * - 资源主题和路径主题完全不相关: -30（过滤掉）
+     */
+    private int calculateMatchScore(LearningResource resource, LearningPath path, boolean isLinked, String topic) {
+        int score = 20; // 基础分
+
+        // 关联了路径步骤的资源直接高分
+        if (isLinked) score += 35;
+
+        // 主题相关性判断（核心）
+        String title = resource.getResourceTitle() != null ? resource.getResourceTitle().toLowerCase() : "";
+        String kp = resource.getKnowledgePoint() != null ? resource.getKnowledgePoint().toLowerCase() : "";
+        String topicLower = topic.toLowerCase();
+
+        boolean titleMatch = containsTopic(title, topicLower);
+        boolean kpMatch = containsTopic(kp, topicLower);
+
+        if (titleMatch) score += 20;
+        if (kpMatch) score += 20;
+
+        // 有知识点标签加分
+        if (resource.getKnowledgePoint() != null && !resource.getKnowledgePoint().isEmpty()) score += 5;
+        // 有难度标签加分
+        if (resource.getDifficulty() != null) score += 3;
+
+        // 标题和知识点都不含主题关键词，且没有关联步骤 → 强烈降权
+        if (!titleMatch && !kpMatch && !isLinked) score -= 30;
+
+        return Math.max(0, Math.min(score, 99));
+    }
+
+    /**
+     * 判断文本是否包含主题关键词
+     * 支持简单分词：按空格、逗号等拆分主题词
+     */
+    private boolean containsTopic(String text, String topic) {
+        if (text.isEmpty() || topic.isEmpty()) return false;
+        // 直接包含
+        if (text.contains(topic)) return true;
+        // 按常见分隔符拆分主题，逐个匹配
+        String[] keywords = topic.split("[,，、\\s/\\\\]+");
+        for (String kw : keywords) {
+            kw = kw.trim();
+            if (kw.length() >= 2 && text.contains(kw)) return true;
+        }
+        return false;
+    }
+
+    private String generateRecommendReason(LearningResource resource, LearningPath path, boolean isLinked, String topic) {
         if (isLinked) {
-            return "该资源与" + path.getPathName() + "的步骤直接关联";
+            return "该资源与「" + topic + "」学习路径的步骤直接关联";
         }
-        if (resource.getKnowledgePoint() != null) {
-            return "与当前学习步骤知识点「" + resource.getKnowledgePoint() + "」匹配";
+        String kp = resource.getKnowledgePoint();
+        if (kp != null && !kp.isEmpty() && containsTopic(kp.toLowerCase(), topic.toLowerCase())) {
+            return "知识点「" + kp + "」与「" + topic + "」学习主题匹配";
         }
-        return "根据「" + path.getPathName() + "」学习路径推荐";
+        if (resource.getResourceTitle() != null && containsTopic(resource.getResourceTitle().toLowerCase(), topic.toLowerCase())) {
+            return "资源内容与「" + topic + "」学习主题相关";
+        }
+        return "根据「" + topic + "」学习路径推荐";
     }
 
     /**
@@ -568,6 +609,14 @@ public class LearningPathServiceImpl implements LearningPathService {
 
         String prompt = buildDurationPrompt(path, currentSteps, "延长", duration, reason);
         regenerateUnfinishedSteps(pathId, currentSteps, prompt);
+
+        // 更新路径的周期描述
+        String newDuration = "延长" + duration;
+        LambdaUpdateWrapper<LearningPath> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(LearningPath::getId, pathId)
+                .set(LearningPath::getDuration, newDuration);
+        pathMapper.update(null, wrapper);
+        path.setDuration(newDuration);
     }
 
     /**
@@ -579,6 +628,14 @@ public class LearningPathServiceImpl implements LearningPathService {
 
         String prompt = buildDurationPrompt(path, currentSteps, "压缩", duration, reason);
         regenerateUnfinishedSteps(pathId, currentSteps, prompt);
+
+        // 更新路径的周期描述
+        String newDuration = "压缩" + duration;
+        LambdaUpdateWrapper<LearningPath> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(LearningPath::getId, pathId)
+                .set(LearningPath::getDuration, newDuration);
+        pathMapper.update(null, wrapper);
+        path.setDuration(newDuration);
     }
 
     /**

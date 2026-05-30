@@ -147,6 +147,7 @@ CREATE TABLE `learning_path` (
   `total_step` int DEFAULT '0' COMMENT '总步骤数',
   `current_step` int DEFAULT '0' COMMENT '当前步骤',
   `status` varchar(20) DEFAULT 'doing' COMMENT '状态 doing/finish',
+  `duration` varchar(50) DEFAULT NULL COMMENT '学习周期描述 如2周/1个月/2个月/3个月',
   `deleted` tinyint DEFAULT 0 COMMENT '是否删除 0否 1是',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

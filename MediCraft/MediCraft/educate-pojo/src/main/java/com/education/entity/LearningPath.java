@@ -52,6 +52,11 @@ public class LearningPath implements Serializable {
      */
     private String status;
 
+    /**
+     * 学习周期描述，如 "2周" "1个月" "2个月" "3个月"
+     */
+    private String duration;
+
     @TableLogic
     private Integer deleted;
 
