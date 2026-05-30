@@ -126,13 +126,16 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         // 5. 调用AI评估智能体
         String aiResponse = assessmentAIAgent.generateEvaluation(
                 profileText, behaviorText, answerText, pathInfo, includeModules);
+        log.info("AI评估响应(前500字): {}", aiResponse != null ? aiResponse.substring(0, Math.min(500, aiResponse.length())) : "null");
 
         // 6. 解析AI响应，构建评估记录
         LearningEvaluate evaluate = new LearningEvaluate();
         evaluate.setUserId(userId);
         evaluate.setEvaluateContent(aiResponse);
         evaluate.setImproveSuggest(assessmentAIAgent.extractImproveSuggest(aiResponse));
-        evaluate.setKnowledgeMastery(assessmentAIAgent.parseKnowledgeMastery(aiResponse));
+        String masteryJson = assessmentAIAgent.parseKnowledgeMastery(aiResponse);
+        log.info("解析到knowledgeMastery: {}", masteryJson);
+        evaluate.setKnowledgeMastery(masteryJson);
         evaluate.setStartTime(LocalDateTime.now().minusDays(7));
         evaluate.setEndTime(LocalDateTime.now());
         evaluate.setDeleted(0);

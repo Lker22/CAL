@@ -105,6 +105,7 @@ public class AssessmentAIAgent {
      * 定位【知识点掌握度】段落，从中提取JSON
      */
     public String parseKnowledgeMastery(String aiResponse) {
+        System.out.println("[AssessmentAIAgent] AI响应长度: " + (aiResponse != null ? aiResponse.length() : "null"));
         if (aiResponse == null || aiResponse.isEmpty()) {
             return "{}";
         }
