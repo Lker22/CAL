@@ -54,7 +54,7 @@ public class AssessmentController {
     /**
      * AI生成评估报告
      * POST /assessment/report/generate
-     * Body: { "pathId": 1, "includeModules": "learningTime,answer" }
+     * Body: { "period": "week", "pathId": 1, "includeModules": "learningTime,answer" }
      */
     @PostMapping("/report/generate")
     public Result generateReport(@RequestBody Map<String, Object> param) {

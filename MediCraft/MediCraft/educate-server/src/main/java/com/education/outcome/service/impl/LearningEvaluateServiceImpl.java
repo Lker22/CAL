@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.education.context.BaseContext;
 import com.education.entity.LearningBehavior;
 import com.education.entity.LearningEvaluate;
+import com.education.entity.LearningPath;
 import com.education.entity.QuestionAnswerRecord;
 import com.education.entity.StudentProfile;
 import com.education.outcome.agent.AssessmentAIAgent;
@@ -15,6 +16,8 @@ import com.education.outcome.service.LearningBehaviorService;
 import com.education.outcome.service.LearningEvaluateService;
 import com.education.outcome.service.LearningPathStepService;
 import com.education.outcome.service.QuestionAnswerRecordService;
+import com.education.path.mapper.LearningPathMapper;
+import com.education.resource.mapper.LearningResourceMapper;
 import com.education.user.service.StudentProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +37,8 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
     private final LearningBehaviorService learningBehaviorService;
     private final QuestionAnswerRecordService questionAnswerRecordService;
     private final LearningPathStepService learningPathStepService;
+    private final LearningPathMapper learningPathMapper;
+    private final LearningResourceMapper learningResourceMapper;
     private final AssessmentAIAgent assessmentAIAgent;
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -206,18 +211,29 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         }
         stats.put("behaviorByType", behaviorByType);
 
-        // 资源类型分布（前端需要 type、count、percentage 三个字段）
-        long totalBehaviors = Math.max(behaviors.size(), 1);
+        // 资源类型分布（查 learning_resource 表按 resource_type 分组）
+        Map<String, String> typeLabels = Map.of(
+                "document", "文档", "mind", "思维导图", "question", "题库", "case", "实操案例"
+        );
+        LambdaQueryWrapper<com.education.entity.LearningResource> resWrapper = new LambdaQueryWrapper<>();
+        resWrapper.eq(com.education.entity.LearningResource::getUserId, userId)
+                .select(com.education.entity.LearningResource::getResourceType);
+        List<com.education.entity.LearningResource> userResources = learningResourceMapper.selectList(resWrapper);
+        Map<String, Long> typeCount = new LinkedHashMap<>();
+        for (com.education.entity.LearningResource r : userResources) {
+            String t = r.getResourceType() != null ? r.getResourceType() : "other";
+            typeCount.merge(t, 1L, Long::sum);
+        }
+        long totalResources = Math.max(userResources.size(), 1);
         List<Map<String, Object>> resourceStats = new ArrayList<>();
-        for (Map.Entry<String, Long> entry : behaviorByType.entrySet()) {
+        for (Map.Entry<String, Long> entry : typeCount.entrySet()) {
             Map<String, Object> rs = new HashMap<>();
-            rs.put("type", entry.getKey());
+            rs.put("type", typeLabels.getOrDefault(entry.getKey(), entry.getKey()));
             rs.put("count", entry.getValue());
-            rs.put("percentage", Math.round((double) entry.getValue() / totalBehaviors * 100));
+            rs.put("percentage", Math.round((double) entry.getValue() / totalResources * 100));
             resourceStats.add(rs);
         }
         if (resourceStats.isEmpty()) {
-            // 没有数据时给一个占位
             Map<String, Object> rs = new HashMap<>();
             rs.put("type", "暂无数据");
             rs.put("count", 0);
@@ -226,40 +242,41 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         }
         stats.put("resourceStats", resourceStats);
 
-        // 学科进度（前端需要 name、progress、time 三个字段）
-        // 按关联的路径步骤统计
-        Map<String, long[]> subjectMap = new LinkedHashMap<>(); // subjectName → [time, count]
-        for (LearningBehavior b : behaviors) {
-            if (b.getStepId() != null) {
-                String subjectName = "学习路径";
-                try {
-                    var step = learningPathStepService.getById(b.getStepId());
-                    if (step != null) {
-                        var path = baseMapper.selectById(null); // 无法直接查，用默认名
-                        subjectName = "学习路径 #" + b.getStepId();
-                    }
-                } catch (Exception ignored) {}
-                subjectMap.computeIfAbsent(subjectName, k -> new long[]{0, 0});
-                subjectMap.get(subjectName)[0] += b.getDuration() != null ? b.getDuration() / 60 : 0;
-                subjectMap.get(subjectName)[1]++;
-            }
-        }
+        // 学科进度（查 learning_path 表，用真实路径名）
+        LambdaQueryWrapper<LearningPath> pathWrapper = new LambdaQueryWrapper<>();
+        pathWrapper.eq(LearningPath::getUserId, userId)
+                .eq(LearningPath::getDeleted, 0)
+                .orderByDesc(LearningPath::getCreateTime)
+                .last("LIMIT 10");
+        List<LearningPath> paths = learningPathMapper.selectList(pathWrapper);
         List<Map<String, Object>> subjectStats = new ArrayList<>();
-        if (subjectMap.isEmpty()) {
-            // 没有数据时给占位
+        for (LearningPath p : paths) {
+            int total = p.getTotalStep() != null ? p.getTotalStep() : 0;
+            int current = p.getCurrentStep() != null ? p.getCurrentStep() : 0;
+            int progress = total > 0 ? Math.min(100, Math.round((float) current / total * 100)) : 0;
+            // 计算该路径的学习时长
+            long pathMinutes = behaviors.stream()
+                    .filter(b -> b.getStepId() != null)
+                    .filter(b -> {
+                        try {
+                            var step = learningPathStepService.getById(b.getStepId());
+                            return step != null && step.getPathId() != null && step.getPathId().equals(p.getId());
+                        } catch (Exception e) { return false; }
+                    })
+                    .mapToLong(b -> b.getDuration() != null ? b.getDuration() / 60 : 0)
+                    .sum();
             Map<String, Object> s = new HashMap<>();
-            s.put("name", "暂无学习记录");
+            s.put("name", p.getPathName());
+            s.put("progress", progress);
+            s.put("time", pathMinutes);
+            subjectStats.add(s);
+        }
+        if (subjectStats.isEmpty()) {
+            Map<String, Object> s = new HashMap<>();
+            s.put("name", "暂无学习路径");
             s.put("progress", 0);
             s.put("time", 0);
             subjectStats.add(s);
-        } else {
-            for (Map.Entry<String, long[]> entry : subjectMap.entrySet()) {
-                Map<String, Object> s = new HashMap<>();
-                s.put("name", entry.getKey());
-                s.put("progress", Math.min(100, (int) entry.getValue()[1] * 20)); // 每次行为+20%进度
-                s.put("time", entry.getValue()[0]);
-                subjectStats.add(s);
-            }
         }
         stats.put("subjectStats", subjectStats);
 
