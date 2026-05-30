@@ -15,10 +15,10 @@ const periodOptions = [
   { label: '近90天', value: 'quarter' }
 ]
 
-// 评估报告数据（从后端获取）
-// 后端 /assessment/report 返回 List，/assessment/report/generate 返回单个对象
+// 评估报告数据（从 /assessment/result 获取，knowledgeMastery 已被后端解析为对象）
 const reportData = computed(() => {
-  let data = assessmentStore.assessmentReport
+  // 优先用 assessmentResult（来自 /assessment/result，knowledgeMastery 已解析）
+  let data = assessmentStore.assessmentResult || assessmentStore.assessmentReport
   if (!data) return null
   // 如果是数组，取第一条（最新的）
   if (Array.isArray(data)) {
@@ -52,6 +52,8 @@ const generateReport = async () => {
   generating.value = true
   try {
     await assessmentStore.generateReport({ period: selectedPeriod.value })
+    // 生成后从/result获取（knowledgeMastery已解析为对象）
+    await assessmentStore.getAssessmentResult()
     if (assessmentStore.assessmentReport) {
       ElMessage.success('评估报告生成成功')
     } else {
@@ -67,7 +69,8 @@ const generateReport = async () => {
 onMounted(async () => {
   loading.value = true
   try {
-    await assessmentStore.getAssessmentReport()
+    // 从/result获取最新报告（knowledgeMastery已正确解析）
+    await assessmentStore.getAssessmentResult()
   } finally {
     loading.value = false
   }
