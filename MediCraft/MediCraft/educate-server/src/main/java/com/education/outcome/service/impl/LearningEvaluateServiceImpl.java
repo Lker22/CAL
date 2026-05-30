@@ -435,8 +435,9 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         StudentProfile profile = studentProfileService.getByUserId();
         if (profile == null) {
             profile = new StudentProfile();
-            profile.setUserId(userId);
         }
+        // 无论新建还是更新，都必须设置userId
+        profile.setUserId(userId);
         // 标记更新场景为"评估触发"
         profile.setUpdateScene("评估触发");
 
