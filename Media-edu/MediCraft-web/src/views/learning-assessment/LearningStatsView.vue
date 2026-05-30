@@ -34,12 +34,10 @@ const stats = computed(() => {
   }
 })
 
-// 格式化时长：分钟 → XhXXm（补零）
+// 格式化时长：分钟
 const formatTime = (minutes) => {
-  if (!minutes) return '0h00m'
-  const h = Math.floor(minutes / 60)
-  const m = String(minutes % 60).padStart(2, '0')
-  return `${h}h${m}m`
+  if (!minutes) return '0分钟'
+  return `${minutes}分钟`
 }
 
 onMounted(async () => {

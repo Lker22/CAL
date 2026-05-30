@@ -155,12 +155,19 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
                 .le(end != null, QuestionAnswerRecord::getAnswerTime, end);
         List<QuestionAnswerRecord> answers = questionAnswerRecordService.list(answerWrapper);
 
-        // ========== 前端期望的字段（LearningStatsView 用到） ==========
+        // ========== 前端 LearningStatsView 期望的字段 ==========
         // 总学习时长（分钟）
         long totalMinutes = behaviors.stream()
                 .mapToLong(b -> b.getDuration() != null ? b.getDuration() : 0)
                 .sum() / 60;
         stats.put("totalTime", totalMinutes);
+
+        // 学习资源数（关联过的不同资源数）
+        long resourceCount = behaviors.stream()
+                .filter(b -> b.getResourceId() != null)
+                .map(LearningBehavior::getResourceId)
+                .distinct().count();
+        stats.put("totalResources", resourceCount);
 
         // 答题数
         stats.put("totalQuiz", answers.size());
@@ -170,61 +177,101 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         double accuracy = answers.isEmpty() ? 0 : (double) correctCount / answers.size() * 100;
         stats.put("avgScore", Math.round(accuracy));
 
-        // 每日学习时长（近7天）
-        String[] dayNames = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
-        Map<String, Long> dailyMinutes = new LinkedHashMap<>();
-        LocalDateTime now = LocalDateTime.now();
+        // 每日学习时长（近7天，按自然日排列）
+        List<Map<String, Object>> weekData = new ArrayList<>();
+        String[] weekDayNames = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+        java.time.LocalDate today = java.time.LocalDate.now();
         for (int i = 6; i >= 0; i--) {
-            LocalDateTime dayStart = now.minusDays(i).toLocalDate().atStartOfDay();
+            java.time.LocalDate day = today.minusDays(i);
+            LocalDateTime dayStart = day.atStartOfDay();
             LocalDateTime dayEnd = dayStart.plusDays(1);
-            long dayTime = behaviors.stream()
+            long dayMinutes = behaviors.stream()
                     .filter(b -> b.getBehaviorTime() != null
                             && !b.getBehaviorTime().isBefore(dayStart)
                             && b.getBehaviorTime().isBefore(dayEnd))
                     .mapToLong(b -> b.getDuration() != null ? b.getDuration() : 0)
                     .sum() / 60;
-            dailyMinutes.put(dayNames[dayStart.getDayOfWeek().getValue() - 1], dayTime);
-        }
-        List<Map<String, Object>> weekData = new ArrayList<>();
-        for (Map.Entry<String, Long> entry : dailyMinutes.entrySet()) {
-            Map<String, Object> day = new HashMap<>();
-            day.put("day", entry.getKey());
-            day.put("time", entry.getValue());
-            weekData.add(day);
+            Map<String, Object> dayMap = new HashMap<>();
+            dayMap.put("day", weekDayNames[day.getDayOfWeek().getValue() % 7]);
+            dayMap.put("time", dayMinutes);
+            weekData.add(dayMap);
         }
         stats.put("weekData", weekData);
 
-        // 按行为类型统计（resourceStats 用）
+        // 按行为类型统计
         Map<String, Long> behaviorByType = new HashMap<>();
         for (LearningBehavior b : behaviors) {
-            String bt = b.getBehaviorType() != null ? b.getBehaviorType() : "未知";
+            String bt = b.getBehaviorType() != null ? b.getBehaviorType() : "学习";
             behaviorByType.merge(bt, 1L, Long::sum);
         }
         stats.put("behaviorByType", behaviorByType);
 
-        // 资源类型统计（简化：从行为类型推导）
+        // 资源类型分布（前端需要 type、count、percentage 三个字段）
+        long totalBehaviors = Math.max(behaviors.size(), 1);
         List<Map<String, Object>> resourceStats = new ArrayList<>();
         for (Map.Entry<String, Long> entry : behaviorByType.entrySet()) {
             Map<String, Object> rs = new HashMap<>();
             rs.put("type", entry.getKey());
             rs.put("count", entry.getValue());
+            rs.put("percentage", Math.round((double) entry.getValue() / totalBehaviors * 100));
+            resourceStats.add(rs);
+        }
+        if (resourceStats.isEmpty()) {
+            // 没有数据时给一个占位
+            Map<String, Object> rs = new HashMap<>();
+            rs.put("type", "暂无数据");
+            rs.put("count", 0);
+            rs.put("percentage", 0);
             resourceStats.add(rs);
         }
         stats.put("resourceStats", resourceStats);
 
-        // 雷达图数据（AssessmentResultView 用到）
-        int totalSteps = 0;
-        int completedSteps = 0;
-        try {
-            totalSteps = learningPathStepService.countByPath(null);
-            completedSteps = learningPathStepService.countCompleted(null);
-        } catch (Exception ignored) {}
-        double progressScore = totalSteps > 0 ? (double) completedSteps / totalSteps * 100 : 0;
-        stats.put("masteryScore", Math.min(100, Math.round(totalMinutes / 10.0))); // 简化：每10分钟=1分
-        stats.put("applicationScore", Math.round(accuracy * 0.8)); // 简化：正确率的80%
-        stats.put("progressScore", Math.round(progressScore));
+        // 学科进度（前端需要 name、progress、time 三个字段）
+        // 按关联的路径步骤统计
+        Map<String, long[]> subjectMap = new LinkedHashMap<>(); // subjectName → [time, count]
+        for (LearningBehavior b : behaviors) {
+            if (b.getStepId() != null) {
+                String subjectName = "学习路径";
+                try {
+                    var step = learningPathStepService.getById(b.getStepId());
+                    if (step != null) {
+                        var path = baseMapper.selectById(null); // 无法直接查，用默认名
+                        subjectName = "学习路径 #" + b.getStepId();
+                    }
+                } catch (Exception ignored) {}
+                subjectMap.computeIfAbsent(subjectName, k -> new long[]{0, 0});
+                subjectMap.get(subjectName)[0] += b.getDuration() != null ? b.getDuration() / 60 : 0;
+                subjectMap.get(subjectName)[1]++;
+            }
+        }
+        List<Map<String, Object>> subjectStats = new ArrayList<>();
+        if (subjectMap.isEmpty()) {
+            // 没有数据时给占位
+            Map<String, Object> s = new HashMap<>();
+            s.put("name", "暂无学习记录");
+            s.put("progress", 0);
+            s.put("time", 0);
+            subjectStats.add(s);
+        } else {
+            for (Map.Entry<String, long[]> entry : subjectMap.entrySet()) {
+                Map<String, Object> s = new HashMap<>();
+                s.put("name", entry.getKey());
+                s.put("progress", Math.min(100, (int) entry.getValue()[1] * 20)); // 每次行为+20%进度
+                s.put("time", entry.getValue()[0]);
+                subjectStats.add(s);
+            }
+        }
+        stats.put("subjectStats", subjectStats);
+
+        // ========== 前端 AssessmentResultView 雷达图期望的字段 ==========
+        // 没有答题数据时，用行为数据估算分数，避免全0
+        int masteryBase = Math.min(100, (int) (totalMinutes / 2.0)); // 每2分钟=1分
+        int consistencyBase = Math.min(100, behaviors.size() * 15); // 每次行为+15分
+        stats.put("masteryScore", Math.max(masteryBase, answers.isEmpty() ? 0 : Math.round(accuracy)));
+        stats.put("applicationScore", answers.isEmpty() ? masteryBase : Math.round(accuracy * 0.8));
+        stats.put("progressScore", consistencyBase);
         stats.put("accuracyScore", Math.round(accuracy));
-        stats.put("consistencyScore", Math.min(100, behaviors.size() * 10)); // 简化：每10次行为=10分
+        stats.put("consistencyScore", consistencyBase);
 
         // ========== 原有字段（保留兼容） ==========
         stats.put("totalDurationMinutes", totalMinutes);
