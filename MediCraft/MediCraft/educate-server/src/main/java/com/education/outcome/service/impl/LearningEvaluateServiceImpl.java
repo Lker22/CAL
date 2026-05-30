@@ -100,12 +100,27 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         List<QuestionAnswerRecord> answers = questionAnswerRecordService.getByUserId(userId);
         String answerText = formatAnswers(answers);
 
-        // 4. 学习路径完成情况
+        // 4. 学习路径完成情况（没传pathId时自动获取用户的进行中路径）
         String pathInfo = null;
+        if (pathId == null) {
+            // 自动获取用户最新的一条进行中路径
+            LambdaQueryWrapper<LearningPath> pathQuery = new LambdaQueryWrapper<>();
+            pathQuery.eq(LearningPath::getUserId, userId)
+                    .eq(LearningPath::getDeleted, 0)
+                    .orderByDesc(LearningPath::getCreateTime)
+                    .last("LIMIT 1");
+            LearningPath activePath = learningPathMapper.selectOne(pathQuery);
+            if (activePath != null) {
+                pathId = activePath.getId();
+            }
+        }
         if (pathId != null) {
             int completed = learningPathStepService.countCompleted(pathId);
             int total = learningPathStepService.countByPath(pathId);
-            pathInfo = "路径ID:" + pathId + "，已完成" + completed + "/" + total + "个步骤";
+            // 获取路径名称（学习主题）
+            LearningPath path = learningPathMapper.selectById(pathId);
+            String pathName = path != null ? path.getPathName() : "未知";
+            pathInfo = "学习主题：" + pathName + "，已完成" + completed + "/" + total + "个步骤";
         }
 
         // 5. 调用AI评估智能体
