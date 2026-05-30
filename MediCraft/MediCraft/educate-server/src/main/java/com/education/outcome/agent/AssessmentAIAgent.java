@@ -30,20 +30,21 @@ public class AssessmentAIAgent {
                                      String answerData, String pathInfo,
                                      java.util.List<String> includeModules) {
 
+        // 用 .replace() 而非 .formatted()，避免用户数据中的 % 字符被当成格式化占位符
         String prompt = """
                 你是专业的医学教育学习效果评估智能体，请基于以下学生数据生成评估报告。
 
                 学生画像信息：
-                %s
+                __STUDENT_INFO__
 
                 学习行为数据：
-                %s
+                __BEHAVIOR_DATA__
 
                 答题记录数据：
-                %s
+                __ANSWER_DATA__
 
                 学习路径完成情况：
-                %s
+                __PATH_INFO__
 
                 请严格按以下格式输出（不要加```json标记，不要输出多余内容）：
 
@@ -60,8 +61,11 @@ public class AssessmentAIAgent {
 
                 【提升建议】
                 提升建议：结合学生画像给出个性化学习方案。
-                """.formatted(studentInfo, behaviorData, answerData,
-                        pathInfo != null ? pathInfo : "未指定学习路径");
+                """
+                .replace("__STUDENT_INFO__", studentInfo != null ? studentInfo : "暂无画像数据")
+                .replace("__BEHAVIOR_DATA__", behaviorData != null ? behaviorData : "暂无学习行为数据")
+                .replace("__ANSWER_DATA__", answerData != null ? answerData : "暂无答题记录")
+                .replace("__PATH_INFO__", pathInfo != null ? pathInfo : "未指定学习路径");
 
         return chatClient.prompt()
                 .user(prompt)
