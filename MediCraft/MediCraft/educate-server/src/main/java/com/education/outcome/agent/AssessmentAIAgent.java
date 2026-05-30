@@ -31,41 +31,37 @@ public class AssessmentAIAgent {
                                      java.util.List<String> includeModules) {
 
         String prompt = """
-                你是专业的医学教育学习效果评估智能体，请基于以下学生数据生成多维度评估报告：
+                你是专业的医学教育学习效果评估智能体，请基于以下学生数据生成评估报告。
 
                 学生画像信息：
-                {studentInfo}
+                %s
 
                 学习行为数据：
-                {behaviorData}
+                %s
 
                 答题记录数据：
-                {answerData}
+                %s
 
                 学习路径完成情况：
-                {pathInfo}
+                %s
 
-                评估模块要求：{includeModules}
-
-                请按以下结构输出报告（不要输出JSON以外的多余标记）：
+                请严格按以下格式输出（不要加```json标记，不要输出多余内容）：
 
                 【学习概况】
                 简要总结学习时长、活跃度、资源使用情况。
 
                 【知识点掌握度】
-                必须输出JSON格式（不要加```json标记），例如：
+                直接输出JSON对象，键为知识点名称，值为0-100的掌握度分数。例如：
                 {"解剖学":75,"生理学":60,"病理学":85}
+                如果没有具体知识点数据，请根据学习行为推断3-5个相关知识点并给出掌握度分数。
 
                 【薄弱点分析】
                 列出掌握度低于60%的知识点，分析原因。
 
                 【提升建议】
-                提升建议：结合学生画像（认知风格/资源偏好）给出个性化学习方案。
-                """.replace("{studentInfo}", studentInfo)//把真实数据替换进提示词
-                  .replace("{behaviorData}", behaviorData)
-                  .replace("{answerData}", answerData)
-                  .replace("{pathInfo}", pathInfo != null ? pathInfo : "未指定学习路径")
-                  .replace("{includeModules}", includeModules != null ? includeModules.toString() : "全部");
+                提升建议：结合学生画像给出个性化学习方案。
+                """.formatted(studentInfo, behaviorData, answerData,
+                        pathInfo != null ? pathInfo : "未指定学习路径");
 
         return chatClient.prompt()
                 .user(prompt)
@@ -102,21 +98,52 @@ public class AssessmentAIAgent {
 
     /**
      * 从AI响应中提取知识点掌握度JSON字符串
+     * 定位【知识点掌握度】段落，从中提取JSON
      */
     public String parseKnowledgeMastery(String aiResponse) {
-        if (aiResponse == null) {
+        if (aiResponse == null || aiResponse.isEmpty()) {
             return "{}";
         }
-        // 匹配 { "知识点": 数字, ... } 格式的JSON
-        int jsonStart = aiResponse.indexOf("{");
-        int jsonEnd = aiResponse.lastIndexOf("}");
+
+        // 0. 先去掉AI可能包裹的代码块标记 ```json ... ```
+        String cleaned = aiResponse.replaceAll("```json\\s*", "").replaceAll("```\\s*", "");
+
+        // 1. 尝试定位【知识点掌握度】段落
+        String section = cleaned;
+        String[] markers = {"【知识点掌握度】", "知识点掌握度：", "知识点掌握度:"};
+        for (String marker : markers) {
+            int idx = cleaned.indexOf(marker);
+            if (idx != -1) {
+                section = cleaned.substring(idx + marker.length());
+                // 截取到下一个【或结尾
+                int nextSection = section.indexOf("【");
+                if (nextSection != -1) {
+                    section = section.substring(0, nextSection);
+                }
+                break;
+            }
+        }
+
+        // 2. 在段落中找JSON（第一个{到最后一个}）
+        int jsonStart = section.indexOf("{");
+        int jsonEnd = section.lastIndexOf("}");
         if (jsonStart != -1 && jsonEnd > jsonStart) {
-            String jsonCandidate = aiResponse.substring(jsonStart, jsonEnd + 1).trim();
-            // 基本校验：包含冒号说明是key:value格式
+            String jsonCandidate = section.substring(jsonStart, jsonEnd + 1).trim();
             if (jsonCandidate.contains(":")) {
                 return jsonCandidate;
             }
         }
+
+        // 3. 兜底：在整个清理后的响应中找
+        jsonStart = cleaned.indexOf("{");
+        jsonEnd = cleaned.lastIndexOf("}");
+        if (jsonStart != -1 && jsonEnd > jsonStart) {
+            String jsonCandidate = cleaned.substring(jsonStart, jsonEnd + 1).trim();
+            if (jsonCandidate.contains(":")) {
+                return jsonCandidate;
+            }
+        }
+
         return "{}";
     }
 }
