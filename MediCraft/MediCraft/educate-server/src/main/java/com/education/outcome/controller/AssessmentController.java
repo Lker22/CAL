@@ -82,11 +82,30 @@ public class AssessmentController {
      */
     @GetMapping("/result")
     public Result getResult(@RequestParam(required = false) Long reportId) {
+        com.education.entity.LearningEvaluate evaluate;
         if (reportId == null) {
-            // 没指定报告ID，返回当前用户最新的一条
-            return Result.success(evaluateService.getLatestReport(getUserId()));
+            evaluate = evaluateService.getLatestReport(getUserId());
+        } else {
+            evaluate = evaluateService.getById(reportId);
         }
-        return Result.success(evaluateService.getById(reportId));
+        // 转为前端期望的结构
+        if (evaluate == null) {
+            return Result.success(null);
+        }
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("id", evaluate.getId());
+        result.put("evaluateContent", evaluate.getEvaluateContent());
+        result.put("improveSuggest", evaluate.getImproveSuggest());
+        // knowledgeMastery 是 JSON 字符串，转为 knowledgeGraph
+        try {
+            if (evaluate.getKnowledgeMastery() != null) {
+                result.put("knowledgeGraph", com.alibaba.fastjson2.JSON.parse(evaluate.getKnowledgeMastery()));
+            }
+        } catch (Exception e) {
+            result.put("knowledgeGraph", null);
+        }
+        result.put("createTime", evaluate.getCreateTime());
+        return Result.success(result);
     }
 
     /**

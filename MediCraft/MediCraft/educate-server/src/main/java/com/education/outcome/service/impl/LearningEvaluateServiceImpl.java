@@ -155,30 +155,46 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
                 .le(end != null, QuestionAnswerRecord::getAnswerTime, end);
         List<QuestionAnswerRecord> answers = questionAnswerRecordService.list(answerWrapper);
 
-        // 总学习时长（秒→分钟）
-        long totalDuration = behaviors.stream()
+        // ========== 前端期望的字段（LearningStatsView 用到） ==========
+        // 总学习时长（分钟）
+        long totalMinutes = behaviors.stream()
                 .mapToLong(b -> b.getDuration() != null ? b.getDuration() : 0)
-                .sum();
-        stats.put("totalDurationMinutes", totalDuration / 60);
+                .sum() / 60;
+        stats.put("totalTime", totalMinutes);
 
-        // 学习行为次数
-        stats.put("behaviorCount", behaviors.size());
+        // 答题数
+        stats.put("totalQuiz", answers.size());
 
-        // 答题统计
-        stats.put("answerCount", answers.size());
+        // 正确率（0-100）
         long correctCount = answers.stream().filter(a -> a.getIsCorrect() != null && a.getIsCorrect() == 1).count();
-        stats.put("correctCount", correctCount);
         double accuracy = answers.isEmpty() ? 0 : (double) correctCount / answers.size() * 100;
-        stats.put("accuracy", Math.round(accuracy * 10) / 10.0);
+        stats.put("avgScore", Math.round(accuracy));
 
-        // 平均答题时长
-        double avgTime = answers.stream()
-                .filter(a -> a.getSpendTime() != null)
-                .mapToLong(QuestionAnswerRecord::getSpendTime)
-                .average().orElse(0);
-        stats.put("avgSpendTime", Math.round(avgTime));
+        // 每日学习时长（近7天）
+        String[] dayNames = {"周一", "周二", "周三", "周四", "周五", "周六", "周日"};
+        Map<String, Long> dailyMinutes = new LinkedHashMap<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 6; i >= 0; i--) {
+            LocalDateTime dayStart = now.minusDays(i).toLocalDate().atStartOfDay();
+            LocalDateTime dayEnd = dayStart.plusDays(1);
+            long dayTime = behaviors.stream()
+                    .filter(b -> b.getBehaviorTime() != null
+                            && !b.getBehaviorTime().isBefore(dayStart)
+                            && b.getBehaviorTime().isBefore(dayEnd))
+                    .mapToLong(b -> b.getDuration() != null ? b.getDuration() : 0)
+                    .sum() / 60;
+            dailyMinutes.put(dayNames[dayStart.getDayOfWeek().getValue() - 1], dayTime);
+        }
+        List<Map<String, Object>> weekData = new ArrayList<>();
+        for (Map.Entry<String, Long> entry : dailyMinutes.entrySet()) {
+            Map<String, Object> day = new HashMap<>();
+            day.put("day", entry.getKey());
+            day.put("time", entry.getValue());
+            weekData.add(day);
+        }
+        stats.put("weekData", weekData);
 
-        // 按行为类型统计
+        // 按行为类型统计（resourceStats 用）
         Map<String, Long> behaviorByType = new HashMap<>();
         for (LearningBehavior b : behaviors) {
             String bt = b.getBehaviorType() != null ? b.getBehaviorType() : "未知";
@@ -186,7 +202,41 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
         }
         stats.put("behaviorByType", behaviorByType);
 
-        // 日期范围
+        // 资源类型统计（简化：从行为类型推导）
+        List<Map<String, Object>> resourceStats = new ArrayList<>();
+        for (Map.Entry<String, Long> entry : behaviorByType.entrySet()) {
+            Map<String, Object> rs = new HashMap<>();
+            rs.put("type", entry.getKey());
+            rs.put("count", entry.getValue());
+            resourceStats.add(rs);
+        }
+        stats.put("resourceStats", resourceStats);
+
+        // 雷达图数据（AssessmentResultView 用到）
+        int totalSteps = 0;
+        int completedSteps = 0;
+        try {
+            totalSteps = learningPathStepService.countByPath(null);
+            completedSteps = learningPathStepService.countCompleted(null);
+        } catch (Exception ignored) {}
+        double progressScore = totalSteps > 0 ? (double) completedSteps / totalSteps * 100 : 0;
+        stats.put("masteryScore", Math.min(100, Math.round(totalMinutes / 10.0))); // 简化：每10分钟=1分
+        stats.put("applicationScore", Math.round(accuracy * 0.8)); // 简化：正确率的80%
+        stats.put("progressScore", Math.round(progressScore));
+        stats.put("accuracyScore", Math.round(accuracy));
+        stats.put("consistencyScore", Math.min(100, behaviors.size() * 10)); // 简化：每10次行为=10分
+
+        // ========== 原有字段（保留兼容） ==========
+        stats.put("totalDurationMinutes", totalMinutes);
+        stats.put("behaviorCount", behaviors.size());
+        stats.put("answerCount", answers.size());
+        stats.put("correctCount", correctCount);
+        stats.put("accuracy", Math.round(accuracy * 10) / 10.0);
+        double avgTime = answers.stream()
+                .filter(a -> a.getSpendTime() != null)
+                .mapToLong(QuestionAnswerRecord::getSpendTime)
+                .average().orElse(0);
+        stats.put("avgSpendTime", Math.round(avgTime));
         stats.put("startDate", startDate);
         stats.put("endDate", endDate);
         stats.put("type", type);
