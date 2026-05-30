@@ -3,6 +3,7 @@ package com.education.outcome.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.education.context.BaseContext;
 import com.education.entity.LearningBehavior;
@@ -432,7 +433,12 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
      * 将评估结果同步到学习画像
      */
     private void syncProfileFromEvaluation(Long userId, LearningEvaluate evaluate) {
-        StudentProfile profile = studentProfileService.getByUserId();
+        // 不用 studentProfileService.getByUserId()（它依赖BaseContextHolder可能为null）
+        // 直接用 userId 参数查
+        LambdaQueryWrapper<StudentProfile> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(StudentProfile::getUserId, userId);
+        StudentProfile profile = studentProfileService.getOne(queryWrapper);
+
         if (profile == null) {
             profile = new StudentProfile();
         }
@@ -463,7 +469,23 @@ public class LearningEvaluateServiceImpl extends ServiceImpl<LearningEvaluateMap
             }
         }
 
-        studentProfileService.saveOrUpdateProfile(profile);
+        // 不用 saveOrUpdateProfile（它内部用BaseContext.getCurrentId()可能为null）
+        // 直接用传入的userId操作
+        if (profile.getId() != null) {
+            // 已有画像，增量更新updateScene
+            LambdaUpdateWrapper<StudentProfile> updateWrapper = new LambdaUpdateWrapper<>();
+            updateWrapper.eq(StudentProfile::getId, profile.getId())
+                    .set(StudentProfile::getUpdateScene, "评估触发");
+            if (profile.getErrorPronePoints() != null) {
+                updateWrapper.set(StudentProfile::getErrorPronePoints, profile.getErrorPronePoints());
+            }
+            studentProfileService.update(updateWrapper);
+        } else {
+            // 新画像
+            profile.setUserId(userId);
+            profile.setUpdateScene("评估触发");
+            studentProfileService.save(profile);
+        }
     }
 
     /**
