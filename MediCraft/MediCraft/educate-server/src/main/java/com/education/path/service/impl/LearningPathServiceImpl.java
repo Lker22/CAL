@@ -429,12 +429,11 @@ public class LearningPathServiceImpl implements LearningPathService {
                 .orderByDesc(LearningResource::getCreateTime);
         List<LearningResource> allResources = resourceMapper.selectList(wrapper);
 
-        // 3. 按主题相关性过滤+评分，只保留与路径主题相关的资源
+        // 3. 按主题相关性评分（模糊匹配），所有资源都参与推荐
         String topic = path.getPathName();
         List<RecommendedResourceVO> voList = new ArrayList<>();
         for (LearningResource res : allResources) {
             int score = calculateMatchScore(res, path, linkedResourceIds.contains(res.getId()), topic);
-            if (score < 30) continue; // 过滤不相关的资源
             RecommendedResourceVO vo = new RecommendedResourceVO();
             vo.setId(res.getId());
             vo.setTitle(res.getResourceTitle());
@@ -480,53 +479,65 @@ public class LearningPathServiceImpl implements LearningPathService {
     }
 
     /**
-     * 计算资源与路径主题的匹配度
+     * 计算资源与路径主题的匹配度（模糊匹配）
+     * 基础分40分，所有资源都会被推荐，越相关分数越高
      * 评分规则：
-     * - 关联了路径步骤: +25
-     * - 标题包含主题关键词: +20
-     * - 知识点包含主题关键词: +20
+     * - 关联了路径步骤: +40
+     * - 标题精确匹配主题: +30
+     * - 标题关键词匹配: +20
+     * - 知识点精确匹配: +25
+     * - 知识点关键词匹配: +15
+     * - 课程名匹配: +15
      * - 有知识点标签: +5
      * - 有难度标签: +3
-     * - 资源主题和路径主题完全不相关: -30（过滤掉）
      */
     private int calculateMatchScore(LearningResource resource, LearningPath path, boolean isLinked, String topic) {
-        int score = 20; // 基础分
+        int score = 40; // 基础分（保证所有资源都有推荐机会）
 
         // 关联了路径步骤的资源直接高分
-        if (isLinked) score += 35;
+        if (isLinked) score += 40;
 
-        // 主题相关性判断（核心）
+        String topicLower = topic.toLowerCase();
         String title = resource.getResourceTitle() != null ? resource.getResourceTitle().toLowerCase() : "";
         String kp = resource.getKnowledgePoint() != null ? resource.getKnowledgePoint().toLowerCase() : "";
-        String topicLower = topic.toLowerCase();
+        String course = resource.getCourseName() != null ? resource.getCourseName().toLowerCase() : "";
 
-        boolean titleMatch = containsTopic(title, topicLower);
-        boolean kpMatch = containsTopic(kp, topicLower);
+        // 标题匹配
+        if (title.contains(topicLower)) {
+            score += 30; // 标题精确包含主题
+        } else if (matchKeywords(title, topicLower)) {
+            score += 20; // 标题包含主题的关键词
+        }
 
-        if (titleMatch) score += 20;
-        if (kpMatch) score += 20;
+        // 知识点匹配
+        if (!kp.isEmpty()) {
+            if (kp.contains(topicLower)) {
+                score += 25;
+            } else if (matchKeywords(kp, topicLower)) {
+                score += 15;
+            }
+        }
+
+        // 课程名匹配
+        if (!course.isEmpty() && (course.contains(topicLower) || matchKeywords(course, topicLower))) {
+            score += 15;
+        }
 
         // 有知识点标签加分
-        if (resource.getKnowledgePoint() != null && !resource.getKnowledgePoint().isEmpty()) score += 5;
+        if (!kp.isEmpty()) score += 5;
         // 有难度标签加分
         if (resource.getDifficulty() != null) score += 3;
 
-        // 标题和知识点都不含主题关键词，且没有关联步骤 → 强烈降权
-        if (!titleMatch && !kpMatch && !isLinked) score -= 30;
-
-        return Math.max(0, Math.min(score, 99));
+        return Math.min(score, 99);
     }
 
     /**
-     * 判断文本是否包含主题关键词
-     * 支持简单分词：按空格、逗号等拆分主题词
+     * 模糊关键词匹配：把主题拆成关键词，任一关键词出现在文本中即匹配
      */
-    private boolean containsTopic(String text, String topic) {
+    private boolean matchKeywords(String text, String topic) {
         if (text.isEmpty() || topic.isEmpty()) return false;
-        // 直接包含
-        if (text.contains(topic)) return true;
-        // 按常见分隔符拆分主题，逐个匹配
-        String[] keywords = topic.split("[,，、\\s/\\\\]+");
+        // 按常见分隔符拆分主题词
+        String[] keywords = topic.split("[,，、\\s/\\\\\\-]+");
         for (String kw : keywords) {
             kw = kw.trim();
             if (kw.length() >= 2 && text.contains(kw)) return true;
@@ -539,10 +550,11 @@ public class LearningPathServiceImpl implements LearningPathService {
             return "该资源与「" + topic + "」学习路径的步骤直接关联";
         }
         String kp = resource.getKnowledgePoint();
-        if (kp != null && !kp.isEmpty() && containsTopic(kp.toLowerCase(), topic.toLowerCase())) {
+        String title = resource.getResourceTitle();
+        if (kp != null && !kp.isEmpty() && (kp.toLowerCase().contains(topic.toLowerCase()) || matchKeywords(kp.toLowerCase(), topic.toLowerCase()))) {
             return "知识点「" + kp + "」与「" + topic + "」学习主题匹配";
         }
-        if (resource.getResourceTitle() != null && containsTopic(resource.getResourceTitle().toLowerCase(), topic.toLowerCase())) {
+        if (title != null && (title.toLowerCase().contains(topic.toLowerCase()) || matchKeywords(title.toLowerCase(), topic.toLowerCase()))) {
             return "资源内容与「" + topic + "」学习主题相关";
         }
         return "根据「" + topic + "」学习路径推荐";
