@@ -3,7 +3,7 @@ import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useResourceStore } from '@/stores/resource'
 import { ElMessage } from 'element-plus'
-import { AI_AGENTS, RESOURCE_TYPES } from '@/utils/constants'
+import { RESOURCE_TYPES } from '@/utils/constants'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,10 +11,9 @@ const resourceStore = useResourceStore()
 
 const loading = ref(false)
 
-// 当前选择的智能体
+// 当前选择的智能体（从 store 获取，包含后端数据库 ID）
 const currentAgent = computed(() => {
-  const agentId = route.query.agentId || resourceStore.selectedAgent?.id
-  return AI_AGENTS.find((a) => a.id === agentId) || AI_AGENTS[0]
+  return resourceStore.selectedAgent || { id: null, agentRole: 'document', name: '文档生成智能体', color: '#67C23A' }
 })
 
 // 生成表单
@@ -36,19 +35,19 @@ const difficultyOptions = [
   { value: 'hard', label: '挑战级' }
 ]
 
-// 智能体支持的资源类型映射
+// 智能体支持的资源类型映射（key = 数据库 agentRole，value = RESOURCE_TYPES key）
 const agentResourceTypes = {
-  requirement: ['document', 'mindmap'],
+  demand: ['document', 'mind'],
   document: ['document'],
-  mindmap: ['mindmap'],
-  quiz: ['quiz'],
-  practice: ['practice'],
-  multimodal: ['videoScript', 'document']
+  mind: ['mind'],
+  question: ['question'],
+  case: ['case'],
+  multimodal: ['document']
 }
 
 // 当前智能体支持的资源类型
 const availableTypes = computed(() => {
-  const types = agentResourceTypes[currentAgent.value.id] || ['document']
+  const types = agentResourceTypes[currentAgent.value.agentRole] || ['document']
   return resourceTypeOptions.filter((t) => types.includes(t.key))
 })
 
@@ -65,6 +64,11 @@ const handleGenerate = async () => {
 
   loading.value = true
   try {
+    if (!currentAgent.value.id) {
+      ElMessage.warning('请先选择一个智能体')
+      router.push('/agent/list')
+      return
+    }
     await resourceStore.generateResource({
       agentId: currentAgent.value.id,
       ...generateForm
@@ -72,9 +76,8 @@ const handleGenerate = async () => {
     ElMessage.success('资源生成任务已提交')
     router.push('/generation/progress')
   } catch (error) {
-    // 模拟成功（开发阶段）
-    ElMessage.success('资源生成任务已提交')
-    router.push('/generation/progress')
+    const msg = error?.response?.data?.msg || error?.message || '资源生成失败，请重试'
+    ElMessage.error(msg)
   } finally {
     loading.value = false
   }

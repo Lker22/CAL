@@ -1,6 +1,6 @@
 package com.education.user.service.impl;
 
-import com.education.ai.service.AIChatService;
+import com.education.resource.service.AIChatService;
 import com.education.entity.ChatContext;
 import com.education.entity.StudentProfile;
 import com.education.user.service.ChatContextService;

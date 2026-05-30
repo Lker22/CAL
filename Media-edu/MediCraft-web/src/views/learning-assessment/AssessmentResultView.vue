@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment'
 import { CircleCheck, EditPen, VideoCamera } from '@element-plus/icons-vue'
 
@@ -7,52 +7,59 @@ const assessmentStore = useAssessmentStore()
 
 const loading = ref(false)
 
-// 示例评估结果数据
-const result = ref({
-  knowledgeGraph: {
-    mastered: 65,
-    learning: 25,
-    pending: 10
-  },
-  trendData: [
-    { date: '01-09', score: 75 },
-    { date: '01-10', score: 78 },
-    { date: '01-11', score: 80 },
-    { date: '01-12', score: 77 },
-    { date: '01-13', score: 82 },
-    { date: '01-14', score: 85 },
-    { date: '01-15', score: 88 }
-  ],
-  weakPoints: [
-    { name: '概率统计', mastery: 45 },
-    { name: '线性代数', mastery: 55 },
-    { name: '算法复杂度', mastery: 60 }
-  ],
-  recentActivity: [
-    { type: 'completed', title: 'Python 基础语法', date: '2024-01-15' },
-    { type: 'quiz', title: '数据结构练习题', score: 92, date: '2024-01-14' },
-    { type: 'video', title: '神经网络教程', duration: 45, date: '2024-01-14' }
-  ]
+// 默认空结果
+const emptyResult = {
+  knowledgeGraph: { mastered: 0, learning: 0, pending: 100 },
+  trendData: [],
+  weakPoints: [],
+  recentActivity: []
+}
+
+// 优先使用 store 中的后端数据
+const result = computed(() => {
+  const data = assessmentStore.assessmentResult
+  if (!data) return emptyResult
+  return {
+    knowledgeGraph: data.knowledgeGraph || emptyResult.knowledgeGraph,
+    trendData: data.trendData || [],
+    weakPoints: data.weakPoints || [],
+    recentActivity: data.recentActivity || []
+  }
 })
 
-// 雷达图数据
-const radarData = ref([
-  { name: '知识掌握', value: 82 },
-  { name: '技能应用', value: 75 },
-  { name: '学习进度', value: 88 },
-  { name: '练习正确率', value: 90 },
-  { name: '学习持续性', value: 85 }
-])
-
-// 雷达图最大值
-const radarMax = 100
+// 雷达图数据（从评估结果或统计数据中提取）
+const radarData = computed(() => {
+  const data = assessmentStore.assessmentResult
+  if (data?.radarData) return data.radarData
+  // 从统计数据中构建雷达图
+  const stats = assessmentStore.learningStats
+  if (stats) {
+    return [
+      { name: '知识掌握', value: stats.masteryScore || 0 },
+      { name: '技能应用', value: stats.applicationScore || 0 },
+      { name: '学习进度', value: stats.progressScore || 0 },
+      { name: '练习正确率', value: stats.accuracyScore || 0 },
+      { name: '学习持续性', value: stats.consistencyScore || 0 }
+    ]
+  }
+  return [
+    { name: '知识掌握', value: 0 },
+    { name: '技能应用', value: 0 },
+    { name: '学习进度', value: 0 },
+    { name: '练习正确率', value: 0 },
+    { name: '学习持续性', value: 0 }
+  ]
+})
 
 onMounted(async () => {
   loading.value = true
   try {
-    await assessmentStore.getAssessmentResult()
+    await Promise.all([
+      assessmentStore.getAssessmentResult(),
+      assessmentStore.getLearningStats()
+    ])
   } catch (error) {
-    console.warn('获取评估结果失败，使用本地数据')
+    console.warn('获取评估结果失败:', error.message)
   } finally {
     loading.value = false
   }
@@ -74,7 +81,7 @@ onMounted(async () => {
           <el-progress
             type="dashboard"
             :percentage="result.knowledgeGraph.mastered"
-            :color="{ '0%': '#409EFF', '100%': '#67C23A' }"
+            :color="() => '#67C23A'"
             :format="(p) => `${p}% 已掌握`"
           />
           <div class="knowledge-legend">
@@ -132,7 +139,7 @@ onMounted(async () => {
             <span class="weakpoint-name">{{ point.name }}</span>
             <el-progress
               :percentage="point.mastery"
-              :color="point.mastery < 60 ? '#F56C6C' : '#E6A23C'"
+              :color="(p) => p < 60 ? '#F56C6C' : '#E6A23C'"
               :show-text="false"
             />
             <span class="weakpoint-score">{{ point.mastery }}%</span>

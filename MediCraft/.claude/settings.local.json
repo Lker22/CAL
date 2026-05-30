@@ -27,7 +27,16 @@
       "Bash(setx JAVA_HOME *)",
       "Bash(cmd.exe *)",
       "Bash(export JAVA_HOME=\"D:/Java.study/类库/jdk17\")",
-      "Bash(mvn --version)"
+      "Bash(mvn --version)",
+      "Bash(jar tf *)",
+      "Bash(cd /tmp)",
+      "Bash(jar xf *)",
+      "Bash(javap -c -p org/springframework/ai/openai/api/OpenAiApi.class)",
+      "Bash(javap -p org/springframework/ai/openai/api/OpenAiApi.class)",
+      "Bash(javap -p 'org/springframework/ai/openai/api/OpenAiApi$Builder.class')",
+      "Bash(javap -p -cp D:/maven/apache-maven-3.9.11-bin/apache-maven-3.9.11/mvn_repository/org/springframework/ai/spring-ai-openai/1.0.0-M6/spring-ai-openai-1.0.0-M6.jar 'org.springframework.ai.openai.api.OpenAiApi$Builder')",
+      "Bash(mysql *)",
+      "Bash(perl *)"
     ]
   }
 }

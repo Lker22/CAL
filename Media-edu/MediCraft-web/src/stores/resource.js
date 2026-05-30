@@ -2,6 +2,8 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { resourceApi } from '@/api/resource'
 
+const TASK_STORAGE_KEY = 'resource_current_task'
+
 /**
  * 学习资源状态管理
  * 管理AI智能体生成的学习资源，包括文档、思维导图、题库、视频脚本、实操案例
@@ -16,9 +18,35 @@ export const useResourceStore = defineStore('resource', () => {
   const agents = ref([])
   const selectedAgent = ref(null)
 
-  // 资源生成状态
+  // 资源生成状态 — 从 localStorage 恢复未完成的任务
   const generationTasks = ref([])
-  const currentTask = ref(null)
+  const currentTask = ref(loadTaskFromStorage())
+
+  /**
+   * 从 localStorage 加载任务
+   */
+  function loadTaskFromStorage() {
+    try {
+      const stored = localStorage.getItem(TASK_STORAGE_KEY)
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch { /* ignore */ }
+    return null
+  }
+
+  /**
+   * 将当前任务保存到 localStorage
+   */
+  function saveTaskToStorage(task) {
+    try {
+      if (task) {
+        localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(task))
+      } else {
+        localStorage.removeItem(TASK_STORAGE_KEY)
+      }
+    } catch { /* ignore */ }
+  }
 
   /**
    * 获取智能体列表
@@ -49,6 +77,7 @@ export const useResourceStore = defineStore('resource', () => {
       const response = await resourceApi.generateResource(params)
       currentTask.value = response.data
       generationTasks.value.push(response.data)
+      saveTaskToStorage(response.data)
       return response
     } catch (error) {
       console.warn('[Resource] 生成资源失败:', error.message)
@@ -62,13 +91,13 @@ export const useResourceStore = defineStore('resource', () => {
   async function getGenerationProgress(taskId) {
     try {
       const response = await resourceApi.getGenerationProgress(taskId)
-      // 更新任务状态
-      const taskIndex = generationTasks.value.findIndex(t => t.id === taskId)
+      const taskIndex = generationTasks.value.findIndex(t => t.taskId === taskId)
       if (taskIndex !== -1) {
         generationTasks.value[taskIndex] = response.data
       }
-      if (currentTask.value && currentTask.value.id === taskId) {
+      if (currentTask.value && currentTask.value.taskId === taskId) {
         currentTask.value = response.data
+        saveTaskToStorage(response.data)
       }
       return response
     } catch (error) {
@@ -132,10 +161,11 @@ export const useResourceStore = defineStore('resource', () => {
   }
 
   /**
-   * 清空当前任务
+   * 清空当前任务（同时清除 localStorage）
    */
   function clearCurrentTask() {
     currentTask.value = null
+    saveTaskToStorage(null)
   }
 
   return {

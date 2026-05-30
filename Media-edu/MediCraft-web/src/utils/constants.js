@@ -94,13 +94,12 @@ export const AI_AGENTS = [
   }
 ]
 
-// 资源类型
+// 资源类型（key 必须和后端 LearningResource.resourceType 一致）
 export const RESOURCE_TYPES = {
   document: { key: 'document', label: '文档', icon: 'Document', color: '#67C23A' },
-  mindmap: { key: 'mindmap', label: '思维导图', icon: 'Share', color: '#E6A23C' },
-  quiz: { key: 'quiz', label: '题库', icon: 'EditPen', color: '#F56C6C' },
-  videoScript: { key: 'videoScript', label: '视频脚本', icon: 'VideoCamera', color: '#B37FEB' },
-  practice: { key: 'practice', label: '实操案例', icon: 'SetUp', color: '#909399' }
+  mind: { key: 'mind', label: '思维导图', icon: 'Share', color: '#E6A23C' },
+  question: { key: 'question', label: '题库', icon: 'EditPen', color: '#F56C6C' },
+  case: { key: 'case', label: '实操案例', icon: 'SetUp', color: '#909399' }
 }
 
 // 学习路径状态
@@ -118,10 +117,12 @@ export const STEP_STATUS = {
   completed: { key: 'completed', label: '已完成', color: '#67C23A' }
 }
 
-// 资源生成任务状态
+// 资源生成任务状态（与后端 ResourceGenerateTask.status 对齐）
 export const GENERATION_STATUS = {
   pending: { key: 'pending', label: '排队中', color: '#909399' },
+  running: { key: 'running', label: '生成中', color: '#409EFF' },
   processing: { key: 'processing', label: '生成中', color: '#409EFF' },
+  success: { key: 'success', label: '已完成', color: '#67C23A' },
   completed: { key: 'completed', label: '已完成', color: '#67C23A' },
   failed: { key: 'failed', label: '失败', color: '#F56C6C' }
 }

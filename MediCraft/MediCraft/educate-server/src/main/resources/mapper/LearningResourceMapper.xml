@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.education.ai.mapper.LearningResourceMapper">
+
+    <select id="queryMyResource" resultType="com.education.entity.LearningResource">
+        SELECT lr.*, aa.agent_name
+        FROM learning_resource lr
+        LEFT JOIN ai_agent aa ON lr.agent_id = aa.id
+        WHERE lr.user_id = #{dto.userId}
+          AND lr.deleted = 0
+          <if test="dto.type != null and dto.type != ''">
+              AND lr.resource_type = #{dto.type}
+          </if>
+          <if test="dto.keyword != null and dto.keyword != ''">
+              AND (lr.resource_title LIKE CONCAT('%', #{dto.keyword}, '%')
+                   OR lr.knowledge_point LIKE CONCAT('%', #{dto.keyword}, '%'))
+          </if>
+        ORDER BY lr.create_time DESC
+    </select>
+
+</mapper>

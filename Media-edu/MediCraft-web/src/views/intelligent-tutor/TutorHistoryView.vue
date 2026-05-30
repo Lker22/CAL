@@ -10,42 +10,12 @@ const router = useRouter()
 const tutorStore = useTutorStore()
 
 const loading = ref(false)
-
-// 示例历史记录
-const mockHistory = ref([
-  {
-    id: 1,
-    question: '如何理解神经网络的反向传播算法？',
-    answerPreview: '反向传播是训练神经网络的核心算法，通过计算损失函数对每个参数的梯度...',
-    createdAt: '2024-01-15 14:30',
-    type: 'text'
-  },
-  {
-    id: 2,
-    question: 'Python中列表和元组有什么区别？',
-    answerPreview: '列表是可变的，元组是不可变的。列表使用方括号[]，元组使用圆括号()...',
-    createdAt: '2024-01-14 10:15',
-    type: 'text'
-  },
-  {
-    id: 3,
-    question: '请分析这张数据库设计图',
-    answerPreview: '从图中可以看到，这是一个电商系统的数据库设计，包含用户表、订单表、商品表...',
-    createdAt: '2024-01-13 16:45',
-    type: 'image'
-  },
-  {
-    id: 4,
-    question: '什么是HTTP协议的工作原理？',
-    answerPreview: 'HTTP协议采用请求-响应模型，基于TCP/IP协议，默认端口80...',
-    createdAt: '2024-01-12 09:20',
-    type: 'text'
-  }
-])
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 // 查看详情
 const viewDetail = (record) => {
-  router.push('/tutor/answer')
+  router.push(`/tutor/answer/${record.recordId}`)
 }
 
 // 删除记录
@@ -54,10 +24,12 @@ const handleDelete = async (record) => {
     await ElMessageBox.confirm('确定要删除这条答疑记录吗？', '删除确认', {
       type: 'warning'
     })
-    mockHistory.value = mockHistory.value.filter((r) => r.id !== record.id)
+    await tutorStore.deleteRecord(record.recordId)
     ElMessage.success('删除成功')
-  } catch {
-    // 取消
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -66,13 +38,24 @@ const askMore = () => {
   router.push('/tutor/question')
 }
 
-onMounted(async () => {
+// 分页
+const handlePageChange = (page) => {
+  currentPage.value = page
+  loadHistory()
+}
+
+// 加载历史
+const loadHistory = async () => {
   loading.value = true
   try {
-    await tutorStore.getHistory()
+    await tutorStore.getHistory({ page: currentPage.value, pageSize: pageSize.value })
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadHistory()
 })
 </script>
 
@@ -86,20 +69,20 @@ onMounted(async () => {
 
     <div v-loading="loading" class="history-list">
       <div
-        v-for="record in mockHistory"
-        :key="record.id"
+        v-for="record in tutorStore.historyRecords"
+        :key="record.recordId"
         class="history-card"
         @click="viewDetail(record)"
       >
         <div class="history-header">
           <div class="question-area">
-            <el-tag v-if="record.type === 'image'" size="small" type="warning">图片提问</el-tag>
+            <el-tag v-if="record.imageUrl" size="small" type="warning">含图解</el-tag>
             <h4>{{ record.question }}</h4>
           </div>
-          <span class="time">{{ formatRelativeTime(record.createdAt) }}</span>
+          <span class="time">{{ formatRelativeTime(record.createTime) }}</span>
         </div>
 
-        <p class="answer-preview">{{ record.answerPreview }}</p>
+        <p class="answer-preview">{{ record.textAnswer }}</p>
 
         <div class="history-actions" @click.stop>
           <el-button type="primary" text size="small" @click="viewDetail(record)">
@@ -112,7 +95,18 @@ onMounted(async () => {
       </div>
     </div>
 
-    <EmptyState v-if="!loading && mockHistory.length === 0" description="暂无答疑记录">
+    <!-- 分页 -->
+    <div v-if="tutorStore.historyTotal > pageSize" class="pagination-area">
+      <el-pagination
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :total="tutorStore.historyTotal"
+        layout="prev, pager, next"
+        @current-change="handlePageChange"
+      />
+    </div>
+
+    <EmptyState v-if="!loading && tutorStore.historyRecords.length === 0" description="暂无答疑记录">
       <el-button type="primary" @click="askMore">开始提问</el-button>
     </EmptyState>
   </div>
@@ -205,5 +199,11 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.pagination-area {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>

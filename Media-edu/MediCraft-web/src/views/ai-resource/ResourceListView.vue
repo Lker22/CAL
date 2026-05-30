@@ -14,68 +14,19 @@ const loading = ref(false)
 const activeType = ref('all')
 const searchKeyword = ref('')
 
-// 示例资源数据
-const mockResources = ref([
-  {
-    id: 1,
-    title: '深度学习基础入门文档',
-    type: 'document',
-    agent: '文档生成智能体',
-    createdAt: '2024-01-15 10:30',
-    size: 2048576,
-    status: 'completed'
-  },
-  {
-    id: 2,
-    title: 'Python数据结构思维导图',
-    type: 'mindmap',
-    agent: '思维导图智能体',
-    createdAt: '2024-01-14 15:20',
-    size: 1024000,
-    status: 'completed'
-  },
-  {
-    id: 3,
-    title: '机器学习算法题库',
-    type: 'quiz',
-    agent: '题库智能体',
-    createdAt: '2024-01-13 09:15',
-    size: 512000,
-    status: 'completed'
-  },
-  {
-    id: 4,
-    title: '神经网络实战案例',
-    type: 'practice',
-    agent: '实操案例智能体',
-    createdAt: '2024-01-12 14:00',
-    size: 3072000,
-    status: 'completed'
-  },
-  {
-    id: 5,
-    title: 'AI模型训练视频脚本',
-    type: 'videoScript',
-    agent: '多模态智能体',
-    createdAt: '2024-01-11 11:45',
-    size: 1536000,
-    status: 'completed'
-  }
-])
-
-// 资源列表
+// 从 store 获取资源列表
 const resources = computed(() => {
-  let list = mockResources.value
+  let list = Array.isArray(resourceStore.resources) ? resourceStore.resources : []
 
   // 类型筛选
   if (activeType.value !== 'all') {
-    list = list.filter((r) => r.type === activeType.value)
+    list = list.filter((r) => r.resourceType === activeType.value)
   }
 
   // 关键词搜索
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase()
-    list = list.filter((r) => r.title.toLowerCase().includes(keyword))
+    list = list.filter((r) => (r.resourceTitle || '').toLowerCase().includes(keyword))
   }
 
   return list
@@ -113,7 +64,7 @@ const handleDelete = async (resource) => {
     await ElMessageBox.confirm(`确定要删除"${resource.title}"吗？`, '删除确认', {
       type: 'warning'
     })
-    mockResources.value = mockResources.value.filter((r) => r.id !== resource.id)
+    await resourceStore.deleteResource(resource.id)
     ElMessage.success('删除成功')
   } catch {
     // 取消删除
@@ -166,18 +117,18 @@ onMounted(() => {
         class="resource-card"
         @click="viewDetail(resource)"
       >
-        <div class="resource-icon" :style="{ backgroundColor: getTypeConfig(resource.type).color + '15' }">
-          <el-icon :size="28" :color="getTypeConfig(resource.type).color">
-            <component :is="getTypeConfig(resource.type).icon" />
+        <div class="resource-icon" :style="{ backgroundColor: getTypeConfig(resource.resourceType).color + '15' }">
+          <el-icon :size="28" :color="getTypeConfig(resource.resourceType).color">
+            <component :is="getTypeConfig(resource.resourceType).icon" />
           </el-icon>
         </div>
         <div class="resource-info">
-          <h4 class="resource-title">{{ resource.title }}</h4>
+          <h4 class="resource-title">{{ resource.resourceTitle }}</h4>
           <p class="resource-meta">
-            <span>{{ resource.agent }}</span>
-            <span>{{ formatDate(resource.createdAt, 'MM-DD') }}</span>
+            <span>{{ resource.difficulty || '标准' }}</span>
+            <span>{{ formatDate(resource.createTime, 'MM-DD') }}</span>
           </p>
-          <p class="resource-size">{{ formatFileSize(resource.size) }}</p>
+          <p class="resource-size">{{ resource.courseName || '' }}</p>
         </div>
         <div class="resource-actions" @click.stop>
           <el-button type="danger" text size="small" @click="handleDelete(resource)">

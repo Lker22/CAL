@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useTutorStore } from '@/stores/tutor'
 import { ElMessage } from 'element-plus'
 import { Promotion, Picture, Close } from '@element-plus/icons-vue'
@@ -15,16 +15,17 @@ const isLoading = ref(false)
 
 // 示例问题
 const sampleQuestions = [
-  '什么是机器学习？',
-  'Python中列表和元组的区别？',
-  '如何理解神经网络的反向传播？',
-  '请解释一下HTTP协议的工作原理'
+  '如何高效地做课堂笔记？',
+  '什么是思维导图？怎么用它来复习？',
+  '怎样提高学习时的专注力？',
+  '请解释费曼学习法的核心步骤'
 ]
 
 // 发送提问
 const sendMessage = async () => {
   const text = inputText.value.trim()
   if (!text && uploadedImages.value.length === 0) return
+  if (isLoading.value) return
 
   const questionData = {
     text: text || '请分析这张图片',
@@ -36,64 +37,14 @@ const sendMessage = async () => {
   isLoading.value = true
 
   try {
-    // 使用流式输出
-    await tutorStore.askQuestionStream(questionData, (chunk) => {
+    await tutorStore.askQuestion(questionData, () => {
       scrollToBottom()
     })
   } catch (error) {
-    // 模拟流式回复
-    const mockReply = `这是一个很好的问题！让我为你详细解答。
-
-### 关于"${questionData.text}"
-
-**核心概念：**
-这是计算机科学中的重要基础概念。理解它需要从以下几个方面入手：
-
-1. **基础定义**：首先需要明确基本定义和范畴
-2. **工作原理**：了解其内部运行机制
-3. **应用场景**：掌握实际使用场景
-
-\`\`\`python
-# 示例代码
-def example():
-    print("Hello, AI Learning!")
-\`\`\`
-
-> 💡 提示：建议结合实践项目来加深理解。
-
-如果你还有其他问题，随时可以问我！`
-
-    let currentIndex = 0
-    const interval = setInterval(() => {
-      if (currentIndex < mockReply.length) {
-        const chunk = mockReply.slice(currentIndex, currentIndex + 5)
-        if (tutorStore.currentAnswer) {
-          tutorStore.currentAnswer.answer += chunk
-        } else {
-          tutorStore.currentAnswer = { answer: chunk }
-        }
-        currentIndex += 5
-        scrollToBottom()
-      } else {
-        clearInterval(interval)
-        isLoading.value = false
-        tutorStore.conversationMessages.push({
-          role: 'assistant',
-          content: mockReply,
-          timestamp: Date.now()
-        })
-      }
-    }, 30)
-
-    tutorStore.conversationMessages.push({
-      role: 'user',
-      content: questionData.text,
-      images: questionData.images,
-      timestamp: Date.now()
-    })
-    return
+    ElMessage.error('提问失败，请重试')
   } finally {
     isLoading.value = false
+    scrollToBottom()
   }
 }
 
@@ -220,13 +171,22 @@ const handleKeydown = (e) => {
                 :preview-src-list="msg.images"
               />
             </div>
-            <!-- 文本内容 -->
+            <!-- AI回答 -->
             <StreamText
               v-if="msg.role === 'assistant'"
               :text="msg.content"
-              :is-streaming="isLoading && index === tutorStore.conversationMessages.length - 1"
+              :is-streaming="false"
             />
             <div v-else class="user-text">{{ msg.content }}</div>
+            <!-- AI图解 -->
+            <div v-if="msg.imageUrl" class="ai-image">
+              <el-image
+                :src="msg.imageUrl"
+                fit="contain"
+                :preview-src-list="[msg.imageUrl]"
+                class="ai-explanation-image"
+              />
+            </div>
           </div>
         </div>
 
@@ -237,9 +197,17 @@ const handleKeydown = (e) => {
           </div>
           <div class="message-content">
             <StreamText
-              :text="tutorStore.currentAnswer.answer"
+              :text="tutorStore.currentAnswer.textAnswer"
               :is-streaming="true"
             />
+            <div v-if="tutorStore.currentAnswer.imageUrl" class="ai-image">
+              <el-image
+                :src="tutorStore.currentAnswer.imageUrl"
+                fit="contain"
+                :preview-src-list="[tutorStore.currentAnswer.imageUrl]"
+                class="ai-explanation-image"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -445,6 +413,16 @@ const handleKeydown = (e) => {
 
 .user-text {
   white-space: pre-wrap;
+}
+
+.ai-image {
+  margin-top: 12px;
+}
+
+.ai-explanation-image {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 8px;
 }
 
 .image-preview-area {

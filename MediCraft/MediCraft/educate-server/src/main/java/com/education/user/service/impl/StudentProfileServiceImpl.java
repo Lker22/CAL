@@ -1,5 +1,6 @@
 package com.education.user.service.impl;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -7,9 +8,11 @@ import com.education.context.BaseContext;
 import com.education.entity.StudentProfile;
 import com.education.user.mapper.StudentProfileMapper;
 import com.education.user.service.StudentProfileService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 //画像持久化服务--学生画像安全更新
+@Slf4j
 @Service
 public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper, StudentProfile>
         implements StudentProfileService {
@@ -33,13 +36,13 @@ public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper,
         Long userId = BaseContext.getCurrentId();
         StudentProfile exist = getByUserId();
 
+        // 修复 JSON 字段：errorPronePoints 是 JSON 列，纯文本需包装为 JSON 数组
+        sanitizeJsonFields(profile);
+
         if (exist == null) {
             profile.setUserId(userId);
             save(profile);
         } else {
-//            profile.setId(exist.getId());
-//            profile.setUserId(userId);
-//            updateById(profile);
             // 增量更新：只更新大模型返回的非空字段，保留原有数据
             LambdaUpdateWrapper<StudentProfile> wrapper = new LambdaUpdateWrapper<>();
             wrapper.eq(StudentProfile::getId, exist.getId());
@@ -56,7 +59,7 @@ public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper,
             if (profile.getLearningGoal() != null) {
                 wrapper.set(StudentProfile::getLearningGoal, profile.getLearningGoal());
             }
-            // 易错点
+            // 易错点（JSON列，值已经是合法JSON字符串）
             if (profile.getErrorPronePoints() != null) {
                 wrapper.set(StudentProfile::getErrorPronePoints, profile.getErrorPronePoints());
             }
@@ -77,7 +80,23 @@ public class StudentProfileServiceImpl extends ServiceImpl<StudentProfileMapper,
 
             // 执行更新
             update(wrapper);
+        }
+    }
 
+    /**
+     * 修复 JSON 类型字段的值
+     * errorPronePoints 在数据库中是 JSON 列，纯文本需转为合法 JSON
+     */
+    private void sanitizeJsonFields(StudentProfile profile) {
+        if (profile.getErrorPronePoints() != null) {
+            String val = profile.getErrorPronePoints().trim();
+            // 如果已经是合法 JSON（以 { 或 [ 开头），直接使用
+            if (val.startsWith("[") || val.startsWith("{")) {
+                // 已经是 JSON
+            } else {
+                // 纯文本 → 包装为 JSON 数组
+                profile.setErrorPronePoints(JSON.toJSONString(java.util.List.of(val)));
+            }
         }
     }
 

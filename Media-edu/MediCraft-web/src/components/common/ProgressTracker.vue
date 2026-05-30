@@ -53,7 +53,7 @@ const progressColor = computed(() => {
       </div>
       <el-progress
         :percentage="progress"
-        :color="progressColor"
+        :color="() => progressColor"
         :stroke-width="10"
         :show-text="false"
       />

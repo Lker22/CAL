@@ -41,12 +41,15 @@ export const useProfileStore = defineStore('profile', () => {
 
   function updateDimensions(profileData) {
     if (!profileData) return
+    // 后端 StudentProfile 实体字段名 → 前端常量字段名映射
+    // 实体: learningGoal, learningPace, errorPronePoints, resourcePreference
+    // 前端: learningGoals, learningRhythm, errorPoints, resourcePreference
     profileDimensions.value = {
       knowledgeBase: profileData.knowledgeBase || null,
       cognitiveStyle: profileData.cognitiveStyle || null,
-      learningGoals: profileData.learningGoals || null,
-      errorPoints: profileData.errorPoints || null,
-      learningRhythm: profileData.learningRhythm || null,
+      learningGoals: profileData.learningGoals || profileData.learningGoal || null,
+      errorPoints: profileData.errorPoints || profileData.errorPronePoints || null,
+      learningRhythm: profileData.learningRhythm || profileData.learningPace || null,
       resourcePreference: profileData.resourcePreference || null
     }
   }
@@ -116,7 +119,21 @@ export const useProfileStore = defineStore('profile', () => {
   async function updateProfile(profileData) {
     profileLoading.value = true
     try {
-      const response = await profileApi.updateProfile(profileData)
+      // 前端字段名 → 后端 StudentProfile 实体字段名映射
+      const mappedData = { ...profileData }
+      if ('learningGoals' in mappedData && !('learningGoal' in mappedData)) {
+        mappedData.learningGoal = mappedData.learningGoals
+        delete mappedData.learningGoals
+      }
+      if ('learningRhythm' in mappedData && !('learningPace' in mappedData)) {
+        mappedData.learningPace = mappedData.learningRhythm
+        delete mappedData.learningRhythm
+      }
+      if ('errorPoints' in mappedData && !('errorPronePoints' in mappedData)) {
+        mappedData.errorPronePoints = mappedData.errorPoints
+        delete mappedData.errorPoints
+      }
+      const response = await profileApi.updateProfile(mappedData)
       profile.value = response.data
       updateDimensions(response.data)
       return response

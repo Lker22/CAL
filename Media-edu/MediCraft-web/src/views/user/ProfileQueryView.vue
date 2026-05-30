@@ -9,7 +9,7 @@ const profileStore = useProfileStore()
 const loading = ref(false)
 const editMode = ref(false)
 
-// 可编辑的画像数据
+// 可编辑的画像数据（前端字段名）
 const editForm = reactive({
   knowledgeBase: '',
   cognitiveStyle: '',
@@ -19,21 +19,41 @@ const editForm = reactive({
   resourcePreference: ''
 })
 
+// 后端 StudentProfile 实体字段名 → 前端字段名映射
+const fieldMap = {
+  knowledgeBase: 'knowledgeBase',
+  cognitiveStyle: 'cognitiveStyle',
+  learningGoals: 'learningGoal',
+  errorPoints: 'errorPronePoints',
+  learningRhythm: 'learningPace',
+  resourcePreference: 'resourcePreference'
+}
+
+// 从 profile 数据中读取字段值（兼容前后端字段名 + JSON 数组解析）
+const getFieldValue = (profile, key) => {
+  if (!profile) return ''
+  const raw = profile[key] || profile[fieldMap[key]] || ''
+  if (!raw) return ''
+  // 处理 JSON 数组格式（如 errorPronePoints 存储为 ["xxx"]）
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.join('；')
+      return parsed
+    } catch {
+      return raw
+    }
+  }
+  return raw
+}
+
 // 加载画像
 const loadProfile = async () => {
   loading.value = true
   try {
     await profileStore.getProfile()
   } catch {
-    // 使用示例数据
-    profileStore.profile = {
-      knowledgeBase: '具备计算机科学基础知识，掌握Python和Java编程，了解数据结构与算法基础。',
-      cognitiveStyle: '偏向视觉学习型，喜欢通过图表和视频来理解新概念。',
-      learningGoals: '短期：掌握深度学习基础；中期：完成AI项目实践；长期：成为AI研发人才。',
-      errorPoints: '数学推导能力较弱，概率统计和线性代数应用不够熟练。',
-      learningRhythm: '每天2-3小时，周末4-5小时，上午学习效率最高。',
-      resourcePreference: '偏好视频教程配合文档阅读，喜欢带有代码示例的实操型资源。'
-    }
+    console.warn('画像加载失败')
   } finally {
     loading.value = false
   }
@@ -43,7 +63,7 @@ const loadProfile = async () => {
 const startEdit = () => {
   const profile = profileStore.profile
   Object.keys(editForm).forEach((key) => {
-    editForm[key] = profile?.[key] || ''
+    editForm[key] = getFieldValue(profile, key)
   })
   editMode.value = true
 }
@@ -113,7 +133,7 @@ onMounted(() => {
         <div class="detail-body">
           <p class="detail-desc">{{ dim.description }}</p>
           <div class="detail-value">
-            {{ profileStore.profile?.[dim.key] || '暂无数据' }}
+            {{ getFieldValue(profileStore.profile, dim.key) || '暂无数据' }}
           </div>
         </div>
       </div>

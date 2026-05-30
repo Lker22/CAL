@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment'
 import { Clock, Document, EditPen, Trophy } from '@element-plus/icons-vue'
 
@@ -8,42 +8,46 @@ const assessmentStore = useAssessmentStore()
 const loading = ref(false)
 const selectedTab = ref('overview')
 
-// 示例统计数据
-const stats = ref({
-  totalTime: 3240, // 分钟
-  totalResources: 28,
-  totalQuiz: 156,
-  avgScore: 85,
-  weekData: [
-    { day: '周一', time: 180, quiz: 25 },
-    { day: '周二', time: 150, quiz: 20 },
-    { day: '周三', time: 200, quiz: 30 },
-    { day: '周四', time: 120, quiz: 15 },
-    { day: '周五', time: 180, quiz: 22 },
-    { day: '周六', time: 240, quiz: 28 },
-    { day: '周日', time: 210, quiz: 16 }
-  ],
-  resourceStats: [
-    { type: '文档', count: 12, percentage: 43 },
-    { type: '思维导图', count: 6, percentage: 21 },
-    { type: '题库', count: 5, percentage: 18 },
-    { type: '实操案例', count: 3, percentage: 11 },
-    { type: '视频脚本', count: 2, percentage: 7 }
-  ],
-  subjectStats: [
-    { name: 'Python 基础', progress: 95, time: 800 },
-    { name: '数据结构', progress: 75, time: 600 },
-    { name: '机器学习', progress: 45, time: 400 },
-    { name: '深度学习', progress: 30, time: 300 }
-  ]
+// 默认空数据
+const emptyStats = {
+  totalTime: 0,
+  totalResources: 0,
+  totalQuiz: 0,
+  avgScore: 0,
+  weekData: [],
+  resourceStats: [],
+  subjectStats: []
+}
+
+// 优先使用后端数据
+const stats = computed(() => {
+  const data = assessmentStore.learningStats
+  if (!data) return emptyStats
+  return {
+    totalTime: data.totalTime || 0,
+    totalResources: data.totalResources || 0,
+    totalQuiz: data.totalQuiz || 0,
+    avgScore: data.avgScore || 0,
+    weekData: data.weekData || [],
+    resourceStats: data.resourceStats || [],
+    subjectStats: data.subjectStats || []
+  }
 })
+
+// 格式化时长：分钟 → XhXXm（补零）
+const formatTime = (minutes) => {
+  if (!minutes) return '0h00m'
+  const h = Math.floor(minutes / 60)
+  const m = String(minutes % 60).padStart(2, '0')
+  return `${h}h${m}m`
+}
 
 onMounted(async () => {
   loading.value = true
   try {
     await assessmentStore.getLearningStats()
   } catch (error) {
-    console.warn('获取统计数据失败，使用本地数据')
+    console.warn('获取统计数据失败:', error.message)
   } finally {
     loading.value = false
   }
@@ -63,7 +67,7 @@ onMounted(async () => {
         <div class="stat-card">
           <el-icon :size="32" color="#409EFF"><Clock /></el-icon>
           <div class="stat-content">
-            <span class="stat-value">{{ Math.floor(stats.totalTime / 60) }}h{{ stats.totalTime % 60 }}m</span>
+            <span class="stat-value">{{ stats.totalTime }}分钟</span>
             <span class="stat-label">总学习时长</span>
           </div>
         </div>
@@ -107,7 +111,7 @@ onMounted(async () => {
                 />
               </div>
               <span class="day-label">{{ day.day }}</span>
-              <span class="day-value">{{ day.time }}m</span>
+              <span class="day-value">{{ formatTime(day.time) }}</span>
             </div>
           </div>
         </div>
@@ -128,15 +132,7 @@ onMounted(async () => {
             </div>
             <el-progress
               :percentage="item.percentage"
-              :color="
-                index === 0
-                  ? '#409EFF'
-                  : index === 1
-                  ? '#67C23A'
-                  : index === 2
-                  ? '#E6A23C'
-                  : '#909399'
-              "
+              :color="() => ['#409EFF','#67C23A','#E6A23C','#909399','#B37FEB'][index] || '#909399'"
               :show-text="false"
             />
             <span class="resource-percentage">{{ item.percentage }}%</span>
@@ -157,10 +153,10 @@ onMounted(async () => {
             <div class="subject-info">
               <el-progress
                 :percentage="subject.progress"
-                :color="subject.progress >= 80 ? '#67C23A' : subject.progress >= 50 ? '#409EFF' : '#E6A23C'"
+                :color="(p) => p >= 80 ? '#67C23A' : p >= 50 ? '#409EFF' : '#E6A23C'"
                 :show-text="false"
               />
-              <span class="subject-time">{{ Math.floor(subject.time / 60) }}h{{ subject.time % 60 }}m</span>
+              <span class="subject-time">{{ formatTime(subject.time) }}</span>
             </div>
           </div>
         </div>

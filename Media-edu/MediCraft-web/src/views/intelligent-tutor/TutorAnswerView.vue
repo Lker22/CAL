@@ -1,82 +1,51 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { tutorApi } from '@/api/tutor'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 
 const router = useRouter()
+const route = useRoute()
 
-// 示例解答数据
-const answer = ref({
-  question: '如何理解神经网络的反向传播算法？',
-  answer: `### 反向传播算法详解
-
-反向传播（Backpropagation）是训练神经网络的核心算法。
-
-#### 1. 核心思想
-
-反向传播的核心思想是通过计算损失函数对每个参数的梯度，从输出层向输入层逐层传播误差。
-
-#### 2. 数学原理
-
-\`\`\`
-δ^l = ((W^{l+1})^T δ^{l+1}) ⊙ σ'(z^l)
-\`\`\`
-
-其中：
-- **δ^l** 是第l层的误差项
-- **W^{l+1}** 是第l+1层的权重矩阵
-- **σ'** 是激活函数的导数
-
-#### 3. 计算步骤
-
-1. **前向传播**：计算每一层的输出
-2. **计算损失**：使用损失函数衡量预测误差
-3. **反向传播**：从输出层向输入层计算梯度
-4. **参数更新**：使用梯度下降更新权重
-
-#### 4. 代码实现
-
-\`\`\`python
-import numpy as np
-
-def backprop(X, y, params):
-    m = X.shape[0]
-    grads = {}
-
-    # 前向传播
-    A1 = np.tanh(np.dot(X, params['W1']) + params['b1'])
-    A2 = sigmoid(np.dot(A1, params['W2']) + params['b2'])
-
-    # 反向传播
-    dZ2 = A2 - y
-    grads['dW2'] = (1/m) * np.dot(A1.T, dZ2)
-    grads['db2'] = (1/m) * np.sum(dZ2, axis=0)
-
-    return grads
-\`\`\`
-
-> 💡 **理解提示**：可以把反向传播想象成"责任分配"机制，每个神经元根据自己对最终误差的"贡献"来调整自己的权重。`,
-  format: 'text',
-  hasImage: true,
-  imageUrl: 'https://via.placeholder.com/600x400?text=Neural+Network+Diagram',
-  hasVideo: false
-})
+const loading = ref(true)
+const answer = ref(null)
 
 const goBack = () => {
-  router.push('/tutor/question')
+  router.push('/tutor/history')
 }
+
+onMounted(async () => {
+  const recordId = route.params.recordId
+  if (!recordId) {
+    ElMessage.warning('缺少记录ID')
+    router.push('/tutor/history')
+    return
+  }
+
+  try {
+    const response = await tutorApi.getTutorDetail(recordId)
+    answer.value = response.data
+  } catch (error) {
+    ElMessage.error('获取答疑详情失败')
+    router.push('/tutor/history')
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
-  <div class="tutor-answer-page">
+  <div class="tutor-answer-page" v-loading="loading">
     <div class="page-header">
       <el-button text @click="goBack">
         <el-icon><ArrowLeft /></el-icon>
-        返回提问
+        返回历史
       </el-button>
     </div>
 
-    <div class="answer-container">
+    <div v-if="answer" class="answer-container">
       <!-- 问题展示 -->
       <div class="question-card">
         <h4>问题</h4>
@@ -91,11 +60,11 @@ const goBack = () => {
         </div>
 
         <div class="answer-content">
-          <MarkdownRenderer :content="answer.answer" />
+          <MarkdownRenderer :content="answer.textAnswer" />
         </div>
 
         <!-- 图片讲解 -->
-        <div v-if="answer.hasImage" class="image-explanation">
+        <div v-if="answer.imageUrl" class="image-explanation">
           <h5>图解说明</h5>
           <el-image
             :src="answer.imageUrl"
@@ -106,12 +75,9 @@ const goBack = () => {
         </div>
 
         <!-- 视频讲解 -->
-        <div v-if="answer.hasVideo" class="video-explanation">
+        <div v-if="answer.videoUrl" class="video-explanation">
           <h5>视频讲解</h5>
-          <div class="video-placeholder">
-            <el-icon :size="48" color="#409EFF"><VideoPlay /></el-icon>
-            <p>点击播放视频讲解</p>
-          </div>
+          <video :src="answer.videoUrl" controls class="explanation-video" />
         </div>
       </div>
     </div>
@@ -119,9 +85,9 @@ const goBack = () => {
 </template>
 
 <script>
-import { ArrowLeft, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
 export default {
-  components: { ArrowLeft, VideoPlay }
+  components: { ArrowLeft }
 }
 </script>
 
@@ -225,25 +191,9 @@ export default {
   margin: 0 0 12px;
 }
 
-.video-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 300px;
-  background: #1d1e2c;
-  border-radius: 10px;
-  color: #fff;
-  cursor: pointer;
-  transition: opacity 0.3s;
-}
-
-.video-placeholder:hover {
-  opacity: 0.9;
-}
-
-.video-placeholder p {
-  margin: 12px 0 0;
-  font-size: 14px;
+.explanation-video {
+  width: 100%;
+  max-width: 600px;
+  border-radius: 8px;
 }
 </style>

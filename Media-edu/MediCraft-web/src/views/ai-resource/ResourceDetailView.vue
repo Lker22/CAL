@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useResourceStore } from '@/stores/resource'
+import { resourceApi } from '@/api/resource'
 import { RESOURCE_TYPES } from '@/utils/constants'
 import { formatDate, formatFileSize } from '@/utils/format'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
@@ -14,78 +15,104 @@ const resourceStore = useResourceStore()
 const loading = ref(false)
 const activeTab = ref('preview')
 
-// 示例资源详情
+// 资源详情（从API加载）
 const resource = ref({
   id: route.params.id,
-  title: '深度学习基础入门文档',
-  type: 'document',
-  agent: '文档生成智能体',
-  createdAt: '2024-01-15 10:30',
-  size: 2048576,
-  status: 'completed',
-  content: `# 深度学习基础入门
+  resourceTitle: '',
+  resourceType: 'document',
+  resourceContent: '',
+  createTime: '',
+  difficulty: '',
+  knowledgePoint: '',
+  status: 1
+})
 
-## 1. 什么是深度学习？
+// 题库分页
+const quizPage = ref(1)
+const quizPageSize = 1
 
-深度学习是机器学习的一个分支，它使用多层神经网络来学习数据的分层表示。
+// 解析题库内容为题目数组
+const quizList = computed(() => {
+  if (resource.value.resourceType !== 'question') return []
+  const content = resource.value.resourceContent
+  if (!content) return []
 
-### 1.1 核心概念
+  try {
+    // 尝试直接解析 JSON
+    let arr = JSON.parse(content)
+    if (Array.isArray(arr)) return arr
+    return [arr]
+  } catch {
+    // 尝试提取 markdown 代码块中的 JSON
+    const match = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (match) {
+      try {
+        let arr = JSON.parse(match[1].trim())
+        if (Array.isArray(arr)) return arr
+        return [arr]
+      } catch { /* fall through */ }
+    }
+    // 不是 JSON 格式，作为纯文本题目处理（按编号分割）
+    const lines = content.split('\n').filter(l => l.trim())
+    const questions = []
+    let current = null
+    for (const line of lines) {
+      const qMatch = line.match(/^\s*(\d+)[.、．]\s*(.+)/)
+      if (qMatch) {
+        if (current) questions.push(current)
+        current = { id: questions.length + 1, title: qMatch[2], options: [], answer: '', analysis: '' }
+      } else if (current) {
+        const optMatch = line.match(/^\s*([A-Da-d])[.、．:\s]\s*(.+)/)
+        if (optMatch) {
+          current.options.push(line.trim())
+        } else if (line.includes('答案') || line.includes('Answer')) {
+          current.answer = line.trim()
+        } else if (line.includes('解析') || line.includes('分析')) {
+          current.analysis = line.trim()
+        } else {
+          current.title += '\n' + line
+        }
+      }
+    }
+    if (current) questions.push(current)
+    return questions.length > 0 ? questions : [{ id: 1, title: content, options: [], answer: '', analysis: '' }]
+  }
+})
 
-- **神经网络**：由大量互连的节点（神经元）组成
-- **前向传播**：数据从输入层到输出层的流动
-- **反向传播**：误差从输出层向输入层的反向传递
-- **梯度下降**：优化算法，用于最小化损失函数
-
-## 2. 深度学习的应用
-
-| 领域 | 应用示例 |
-|------|----------|
-| 计算机视觉 | 图像分类、目标检测 |
-| 自然语言处理 | 机器翻译、文本生成 |
-| 语音识别 | 语音助手、实时翻译 |
-| 推荐系统 | 个性化推荐 |
-
-## 3. 常用框架
-
-\`\`\`python
-# PyTorch 示例
-import torch
-import torch.nn as nn
-
-class SimpleNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(784, 128)
-        self.fc2 = nn.Linear(128, 10)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        return self.fc2(x)
-\`\`\`
-
-> 提示：学习深度学习需要掌握线性代数、微积分和概率论的基础知识。
-`
+// 当前显示的题目
+const currentQuiz = computed(() => {
+  if (quizList.value.length === 0) return null
+  return quizList.value[quizPage.value - 1] || quizList.value[0]
 })
 
 // 获取资源类型配置
 const typeConfig = computed(() => {
-  return RESOURCE_TYPES[resource.value.type] || RESOURCE_TYPES.document
+  return RESOURCE_TYPES[resource.value.resourceType] || RESOURCE_TYPES.document
 })
 
 // 加载资源详情
 const loadResource = async () => {
   loading.value = true
   try {
-    // 实际项目中调用API
-    // await resourceStore.getResourceDetail(route.params.id)
+    await resourceStore.getResourceDetail(route.params.id)
+    if (resourceStore.currentResource) {
+      resource.value = resourceStore.currentResource
+    }
+  } catch (error) {
+    ElMessage.error('加载资源详情失败')
   } finally {
     loading.value = false
   }
 }
 
 // 下载资源
-const handleDownload = () => {
-  ElMessage.success('开始下载...')
+const handleDownload = async () => {
+  try {
+    await resourceApi.downloadResource(route.params.id)
+    ElMessage.success('开始下载...')
+  } catch {
+    ElMessage.error('下载失败')
+  }
 }
 
 // 返回列表
@@ -116,14 +143,13 @@ onMounted(() => {
           </el-icon>
         </div>
         <div class="resource-info">
-          <h2>{{ resource.title }}</h2>
+          <h2>{{ resource.resourceTitle }}</h2>
           <div class="meta-info">
             <el-tag size="small" :color="typeConfig.color" effect="dark">
               {{ typeConfig.label }}
             </el-tag>
-            <span>{{ resource.agent }}</span>
-            <span>{{ formatDate(resource.createdAt) }}</span>
-            <span>{{ formatFileSize(resource.size) }}</span>
+            <span>{{ resource.difficulty || '标准' }}</span>
+            <span>{{ formatDate(resource.createTime) }}</span>
           </div>
         </div>
         <div class="header-actions">
@@ -139,29 +165,38 @@ onMounted(() => {
         <el-tabs v-model="activeTab">
           <el-tab-pane label="内容预览" name="preview">
             <div class="preview-area">
-              <!-- 文档类型：显示Markdown -->
-              <MarkdownRenderer v-if="resource.type === 'document'" :content="resource.content" />
+              <!-- 文档/实操案例/思维导图类型：显示Markdown -->
+              <MarkdownRenderer v-if="resource.resourceType === 'document' || resource.resourceType === 'case' || resource.resourceType === 'mind'" :content="resource.resourceContent" />
 
-              <!-- 思维导图类型：显示图片 -->
-              <div v-else-if="resource.type === 'mindmap'" class="mindmap-preview">
-                <el-image
-                  src="https://via.placeholder.com/800x600?text=Mind+Map"
-                  fit="contain"
-                  :preview-src-list="['https://via.placeholder.com/800x600?text=Mind+Map']"
-                />
-              </div>
-
-              <!-- 题库类型：显示题目 -->
-              <div v-else-if="resource.type === 'quiz'" class="quiz-preview">
-                <div class="quiz-item">
-                  <h4>1. 下列哪个不是深度学习框架？</h4>
-                  <ul>
-                    <li>A. TensorFlow</li>
-                    <li>B. PyTorch</li>
-                    <li>C. Scikit-learn</li>
-                    <li>D. Keras</li>
+              <!-- 题库类型：解析JSON/文本，支持翻页 -->
+              <div v-else-if="resource.resourceType === 'question'" class="quiz-preview">
+                <div v-if="currentQuiz" class="quiz-item">
+                  <h4>{{ quizPage }}. {{ currentQuiz.title || currentQuiz.question }}</h4>
+                  <!-- 选项 -->
+                  <ul v-if="currentQuiz.options && currentQuiz.options.length">
+                    <li v-for="(opt, oi) in currentQuiz.options" :key="oi">{{ opt }}</li>
                   </ul>
-                  <p class="answer">答案：C</p>
+                  <!-- 答案 -->
+                  <p v-if="currentQuiz.answer" class="answer">答案：{{ currentQuiz.answer }}</p>
+                  <!-- 解析 -->
+                  <div v-if="currentQuiz.analysis" class="analysis">
+                    <p>{{ currentQuiz.analysis }}</p>
+                  </div>
+                </div>
+                <div v-else class="quiz-item">
+                  <!-- 内容不是标准JSON格式，直接显示原文 -->
+                  <MarkdownRenderer :content="resource.resourceContent" />
+                </div>
+                <!-- 翻页 -->
+                <div v-if="quizList.length > 1" class="quiz-pagination">
+                  <el-pagination
+                    v-model:current-page="quizPage"
+                    :page-size="1"
+                    :total="quizList.length"
+                    layout="prev, pager, next, total"
+                    :pager-count="7"
+                    small
+                  />
                 </div>
               </div>
 
@@ -174,11 +209,11 @@ onMounted(() => {
 
           <el-tab-pane label="详细信息" name="info">
             <el-descriptions :column="1" border>
-              <el-descriptions-item label="资源名称">{{ resource.title }}</el-descriptions-item>
+              <el-descriptions-item label="资源名称">{{ resource.resourceTitle }}</el-descriptions-item>
               <el-descriptions-item label="资源类型">{{ typeConfig.label }}</el-descriptions-item>
-              <el-descriptions-item label="生成智能体">{{ resource.agent }}</el-descriptions-item>
-              <el-descriptions-item label="生成时间">{{ formatDate(resource.createdAt) }}</el-descriptions-item>
-              <el-descriptions-item label="文件大小">{{ formatFileSize(resource.size) }}</el-descriptions-item>
+              <el-descriptions-item label="难度">{{ resource.difficulty || '标准' }}</el-descriptions-item>
+              <el-descriptions-item label="生成时间">{{ formatDate(resource.createTime) }}</el-descriptions-item>
+              <el-descriptions-item label="知识点">{{ resource.knowledgePoint || '-' }}</el-descriptions-item>
               <el-descriptions-item label="状态">
                 <el-tag type="success">已完成</el-tag>
               </el-descriptions-item>
@@ -303,5 +338,27 @@ export default {
   color: #67c23a;
   font-weight: 600;
   margin: 0;
+}
+
+.analysis {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f7ff;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
+}
+
+.analysis p {
+  font-size: 13px;
+  color: #606266;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.quiz-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 16px 0;
 }
 </style>

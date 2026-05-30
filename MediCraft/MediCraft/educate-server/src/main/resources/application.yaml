@@ -18,9 +18,9 @@ spring:
   ai:
     dashscope:
       api-key: ${OPENAI_API_KEY}
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
       chat:
-        model: qwen-plus
+        model: qwen3.6-35b-a3b
   data:
     redis:
       host: localhost
@@ -33,6 +33,11 @@ logging:
         mapper: debug
         service: info
         controller: info
+    org:
+      springframework:
+        ai: DEBUG
+        web:
+          reactive: DEBUG
 
 education:
   jwt:

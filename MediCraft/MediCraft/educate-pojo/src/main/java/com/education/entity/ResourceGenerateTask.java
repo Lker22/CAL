@@ -51,7 +51,7 @@ public class ResourceGenerateTask implements Serializable {
     private String topic;
 
     /**
-     * 生成参数
+     * 生成参数（前端传过来的所有额外参数，存成 JSON 字符串-保存用户生成时的所有设置，方便以后重做、查看、日志追溯）
      */
     private String params;
 

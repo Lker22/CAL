@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useResourceStore } from '@/stores/resource'
 import { AI_AGENTS } from '@/utils/constants'
@@ -10,27 +10,53 @@ const resourceStore = useResourceStore()
 
 const loading = ref(false)
 
+// 数据库 agentRole → 前端展示配置的映射
+const roleConfig = {
+  demand: AI_AGENTS[0],      // 需求解析
+  document: AI_AGENTS[1],    // 文档生成
+  mind: AI_AGENTS[2],        // 思维导图
+  question: AI_AGENTS[3],    // 题库
+  case: AI_AGENTS[4],        // 实操案例
+  multimodal: AI_AGENTS[5]   // 多模态
+}
+
 // 加载智能体列表
 const loadAgents = async () => {
   loading.value = true
   try {
     await resourceStore.getAgents()
   } catch {
-    // 使用本地配置的智能体数据
-    resourceStore.agents = AI_AGENTS
+    resourceStore.agents = []
   } finally {
     loading.value = false
   }
 }
+
+// 合并后端数据和前端展示配置（只显示资源生成类智能体，过滤评估等非资源生成智能体）
+const agentList = computed(() => {
+  const backendAgents = resourceStore.agents
+  if (Array.isArray(backendAgents) && backendAgents.length > 0) {
+    return backendAgents
+      .filter(a => roleConfig[a.agentRole]) // 没有 roleConfig 的不是资源生成智能体（如评估智能体）
+      .map(a => {
+        const config = roleConfig[a.agentRole]
+        return {
+          ...a,
+          name: a.agentName || config.name,
+          description: a.agentDescription || config.description,
+          icon: a.icon || config.icon || 'Cpu',
+          color: config.color || '#409EFF'
+        }
+      })
+  }
+  return []
+})
 
 // 选择智能体并跳转生成页面
 const selectAgent = (agent) => {
   resourceStore.selectAgent(agent)
   router.push({ path: '/resource/generate', query: { agentId: agent.id } })
 }
-
-// 智能体列表（优先使用store数据，否则使用常量配置）
-const agentList = AI_AGENTS
 
 onMounted(() => {
   loadAgents()

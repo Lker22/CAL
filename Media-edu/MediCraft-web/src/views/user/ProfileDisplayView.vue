@@ -11,16 +11,44 @@ const profileStore = useProfileStore()
 
 const loading = ref(false)
 
-// 画像维度数据（使用示例数据进行展示）
+// 格式化值：处理 JSON 数组/对象 → 可读文本
+const formatValue = (val) => {
+  if (!val) return null
+  if (typeof val !== 'string') return val
+  try {
+    const parsed = JSON.parse(val)
+    if (Array.isArray(parsed)) return parsed.join('；')
+    if (typeof parsed === 'object') return JSON.stringify(parsed, null, 2)
+    return parsed
+  } catch {
+    return val
+  }
+}
+
+// 画像维度数据
 const dimensionData = computed(() => {
   const profile = profileStore.profile
   if (!profile) return []
 
-  return Object.entries(PROFILE_DIMENSIONS).map(([key, config]) => ({
-    ...config,
-    value: profile[key] || null,
-    completed: !!profile[key]
-  }))
+  // 后端 StudentProfile 实体字段名 → 前端常量字段名映射
+  const fieldMap = {
+    knowledgeBase: 'knowledgeBase',
+    cognitiveStyle: 'cognitiveStyle',
+    learningGoals: 'learningGoal',
+    errorPoints: 'errorPronePoints',
+    learningRhythm: 'learningPace',
+    resourcePreference: 'resourcePreference'
+  }
+
+  return Object.entries(PROFILE_DIMENSIONS).map(([key, config]) => {
+    const backendKey = fieldMap[key] || key
+    const raw = profile[key] || profile[backendKey] || null
+    return {
+      ...config,
+      value: formatValue(raw),
+      completed: !!raw
+    }
+  })
 })
 
 // 画像完成度
@@ -35,15 +63,8 @@ const loadProfile = async () => {
   try {
     await profileStore.getProfile()
   } catch (error) {
-    // 如果没有画像数据，使用示例数据
-    profileStore.profile = {
-      knowledgeBase: '具备计算机科学基础知识，掌握Python和Java编程，了解数据结构与算法基础，对机器学习有初步了解。',
-      cognitiveStyle: '偏向视觉学习型，喜欢通过图表、思维导图和视频来理解新概念，善于从实例中总结规律。',
-      learningGoals: '短期目标：掌握深度学习基础；中期目标：完成一个AI项目实践；长期目标：成为AI领域研发人才。',
-      errorPoints: '数学推导能力较弱，对概率统计和线性代数应用不够熟练，编程实践中对边界条件处理不够细致。',
-      learningRhythm: '每天可投入2-3小时学习，周末可达4-5小时，上午学习效率最高，每次持续学习45分钟后需要休息。',
-      resourcePreference: '偏好视频教程配合文档阅读，喜欢带有代码示例的实操型资源，偶尔使用题库进行自测巩固。'
-    }
+    // 画像加载失败，保持 null，页面会显示"暂无数据"
+    console.warn('画像加载失败:', error.message)
   } finally {
     loading.value = false
   }
@@ -92,7 +113,7 @@ onMounted(() => {
           :percentage="completionRate"
           :width="80"
           :stroke-width="8"
-          :color="completionRate === 100 ? '#67C23A' : '#409EFF'"
+          :color="() => completionRate === 100 ? '#67C23A' : '#409EFF'"
         />
       </div>
     </div>

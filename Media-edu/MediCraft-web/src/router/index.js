@@ -143,7 +143,7 @@ const router = createRouter({
           component: TutorQuestionView
         },
         {
-          path: '/tutor/answer',
+          path: '/tutor/answer/:recordId?',
           name: 'tutor-answer',
           component: TutorAnswerView
         },

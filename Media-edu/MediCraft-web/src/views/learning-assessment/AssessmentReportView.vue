@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAssessmentStore } from '@/stores/assessment'
 import { formatDate } from '@/utils/format'
@@ -11,36 +11,46 @@ const assessmentStore = useAssessmentStore()
 const loading = ref(false)
 const selectedPeriod = ref('week')
 
-// 示例评估报告数据
-const report = ref({
-  id: 1,
-  generateDate: '2024-01-15',
+// 默认空报告结构
+const emptyReport = {
+  id: null,
+  generateDate: '',
   period: '最近 7 天',
-  overallScore: 85,
-  studyTime: 1260, // 分钟
-  completedSteps: 8,
-  totalSteps: 12,
-  quizAverage: 88,
+  overallScore: 0,
+  studyTime: 0,
+  completedSteps: 0,
+  totalSteps: 0,
+  quizAverage: 0,
   dimensions: [
-    { name: '知识掌握', score: 82, maxScore: 100 },
-    { name: '学习进度', score: 75, maxScore: 100 },
-    { name: '练习正确率', score: 88, maxScore: 100 },
-    { name: '学习持续性', score: 90, maxScore: 100 },
-    { name: '资源利用', score: 85, maxScore: 100 }
+    { name: '知识掌握', score: 0, maxScore: 100 },
+    { name: '学习进度', score: 0, maxScore: 100 },
+    { name: '练习正确率', score: 0, maxScore: 100 },
+    { name: '学习持续性', score: 0, maxScore: 100 },
+    { name: '资源利用', score: 0, maxScore: 100 }
   ],
-  strengths: [
-    '学习持续性好，能够保持每天学习',
-    '练习题正确率较高，基础知识掌握扎实'
-  ],
-  weaknesses: [
-    '学习进度略低于预期，建议适当增加学习时间',
-    '部分难点知识点需要加强复习'
-  ],
-  suggestions: [
-    '建议每天增加 30 分钟学习时间',
-    '针对薄弱知识点进行专项练习',
-    '多利用思维导图整理知识体系'
-  ]
+  strengths: [],
+  weaknesses: [],
+  suggestions: []
+}
+
+// 优先使用 store 中的后端数据，没有则用空结构
+const report = computed(() => {
+  const data = assessmentStore.assessmentReport
+  if (!data) return emptyReport
+  return {
+    id: data.id || null,
+    generateDate: data.createTime ? data.createTime.substring(0, 10) : '',
+    period: periodOptions.find(p => p.value === selectedPeriod.value)?.label || '最近 7 天',
+    overallScore: data.overallScore || 0,
+    studyTime: data.studyTime || 0,
+    completedSteps: data.completedSteps || 0,
+    totalSteps: data.totalSteps || 0,
+    quizAverage: data.quizAverage || 0,
+    dimensions: data.dimensions || emptyReport.dimensions,
+    strengths: data.strengths || [],
+    weaknesses: data.weaknesses || [],
+    suggestions: data.suggestions || []
+  }
 })
 
 const periodOptions = [
@@ -53,9 +63,12 @@ const periodOptions = [
 const generateReport = async () => {
   loading.value = true
   try {
-    await assessmentStore.generateReport({ period: selectedPeriod.value })
+    const res = await assessmentStore.generateReport({ period: selectedPeriod.value })
+    if (res?.data) {
+      // store 已更新 assessmentReport，computed 会自动重新渲染
+    }
   } catch (error) {
-    console.warn('生成报告失败')
+    console.warn('生成报告失败:', error.message)
   } finally {
     loading.value = false
   }
@@ -152,7 +165,7 @@ onMounted(async () => {
             <span class="dimension-name">{{ dim.name }}</span>
             <el-progress
               :percentage="dim.score"
-              :color="dim.score >= 80 ? '#67C23A' : dim.score >= 60 ? '#409EFF' : '#F56C6C'"
+              :color="(p) => p >= 80 ? '#67C23A' : p >= 60 ? '#409EFF' : '#F56C6C'"
               :show-text="false"
             />
             <span class="dimension-score">{{ dim.score }}分</span>

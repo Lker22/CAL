@@ -42,7 +42,8 @@ request.interceptors.response.use(
 
     // 如果响应状态码不是成功状态，进行错误处理
     if (res.code && res.code !== 200 && res.code !== 0) {
-      ElMessage.error(res.message || '请求失败')
+      const msg = res.msg || res.message || '请求失败'
+      ElMessage.error(msg)
 
       // 401: 未授权，跳转登录页
       if (res.code === 401) {
@@ -51,7 +52,10 @@ request.interceptors.response.use(
         router.push('/login')
       }
 
-      return Promise.reject(new Error(res.message || '请求失败'))
+      // 把后端错误信息附到 Error 上，方便业务代码读取
+      const err = new Error(msg)
+      err.response = { data: res }
+      return Promise.reject(err)
     }
 
     return res
