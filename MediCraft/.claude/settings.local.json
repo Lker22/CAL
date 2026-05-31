@@ -36,7 +36,14 @@
       "Bash(javap -p 'org/springframework/ai/openai/api/OpenAiApi$Builder.class')",
       "Bash(javap -p -cp D:/maven/apache-maven-3.9.11-bin/apache-maven-3.9.11/mvn_repository/org/springframework/ai/spring-ai-openai/1.0.0-M6/spring-ai-openai-1.0.0-M6.jar 'org.springframework.ai.openai.api.OpenAiApi$Builder')",
       "Bash(mysql *)",
-      "Bash(perl *)"
+      "Bash(perl *)",
+      "Bash(xxd \"Media-edu/MediCraft-web/src/api/request.js\")",
+      "Bash(python -c *)",
+      "Bash(grep *)",
+      "Bash(npm run *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m '删除多余的迁移文件，MediCraft.sql已包含duration字段 *)",
+      "Bash(xxd)"
     ]
   }
 }

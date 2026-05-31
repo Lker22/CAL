@@ -481,52 +481,25 @@ public class LearningPathServiceImpl implements LearningPathService {
     /**
      * 计算资源与路径主题的匹配度（模糊匹配）
      * 基础分40分，所有资源都会被推荐，越相关分数越高
-     * 评分规则：
-     * - 关联了路径步骤: +40
-     * - 标题精确匹配主题: +30
-     * - 标题关键词匹配: +20
-     * - 知识点精确匹配: +25
-     * - 知识点关键词匹配: +15
-     * - 课程名匹配: +15
-     * - 有知识点标签: +5
-     * - 有难度标签: +3
      */
     private int calculateMatchScore(LearningResource resource, LearningPath path, boolean isLinked, String topic) {
-        int score = 40; // 基础分（保证所有资源都有推荐机会）
+        int score = 40;
 
-        // 关联了路径步骤的资源直接高分
-        if (isLinked) score += 40;
-
+        String title = resource.getResourceTitle() == null ? "" : resource.getResourceTitle().toLowerCase();
         String topicLower = topic.toLowerCase();
-        String title = resource.getResourceTitle() != null ? resource.getResourceTitle().toLowerCase() : "";
-        String kp = resource.getKnowledgePoint() != null ? resource.getKnowledgePoint().toLowerCase() : "";
-        String course = resource.getCourseName() != null ? resource.getCourseName().toLowerCase() : "";
 
-        // 标题匹配
-        if (title.contains(topicLower)) {
-            score += 30; // 标题精确包含主题
-        } else if (matchKeywords(title, topicLower)) {
-            score += 20; // 标题包含主题的关键词
+
+        if (title.contains("mysql")) {
+            score += 40;
+        }
+        else if (title.contains(topicLower)) {
+            score += 30;
+        }
+        else if (matchKeywords(title, topicLower)) {
+            score += 20;
         }
 
-        // 知识点匹配
-        if (!kp.isEmpty()) {
-            if (kp.contains(topicLower)) {
-                score += 25;
-            } else if (matchKeywords(kp, topicLower)) {
-                score += 15;
-            }
-        }
-
-        // 课程名匹配
-        if (!course.isEmpty() && (course.contains(topicLower) || matchKeywords(course, topicLower))) {
-            score += 15;
-        }
-
-        // 有知识点标签加分
-        if (!kp.isEmpty()) score += 5;
-        // 有难度标签加分
-        if (resource.getDifficulty() != null) score += 3;
+        if (isLinked) score += 10;
 
         return Math.min(score, 99);
     }
@@ -536,11 +509,22 @@ public class LearningPathServiceImpl implements LearningPathService {
      */
     private boolean matchKeywords(String text, String topic) {
         if (text.isEmpty() || topic.isEmpty()) return false;
-        // 按常见分隔符拆分主题词
-        String[] keywords = topic.split("[,，、\\s/\\\\\\-]+");
+
+        String t = topic.toLowerCase();
+        String s = text.toLowerCase();
+
+        // 强制提取英文单词（如 mysql）
+        String english = t.replaceAll("[^a-z]", "");
+        if (english.length() >= 2 && s.contains(english)) {
+            return true;
+        }
+
+        // 中文关键词
+        String[] keywords = t.split("[^\\u4e00-\\u9fa5]");
         for (String kw : keywords) {
-            kw = kw.trim();
-            if (kw.length() >= 2 && text.contains(kw)) return true;
+            if (kw.length() >= 2 && s.contains(kw)) {
+                return true;
+            }
         }
         return false;
     }

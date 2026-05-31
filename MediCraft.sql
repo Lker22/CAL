@@ -6,7 +6,7 @@ COLLATE utf8mb4_general_ci;
 USE MediCraft;
 
 -- =============================================
--- 先删除所有表（按依赖关系逆序删除）
+-- 删除所有表（按依赖关系逆序删除）
 -- =============================================
 DROP TABLE IF EXISTS `resource_generate_task`;
 DROP TABLE IF EXISTS `smart_tutor`;
@@ -147,7 +147,6 @@ CREATE TABLE `learning_path` (
   `total_step` int DEFAULT '0' COMMENT '总步骤数',
   `current_step` int DEFAULT '0' COMMENT '当前步骤',
   `status` varchar(20) DEFAULT 'doing' COMMENT '状态 doing/finish',
-  `duration` varchar(50) DEFAULT NULL COMMENT '学习周期描述 如2周/1个月/2个月/3个月',
   `deleted` tinyint DEFAULT 0 COMMENT '是否删除 0否 1是',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -293,3 +292,27 @@ CREATE TABLE `resource_generate_task` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_agent_id` (`agent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资源生成任务表';
+
+
+INSERT INTO `ai_agent` (
+`agent_name`,
+`agent_role`,
+`agent_description`,
+`icon`,
+`prompt_template`,  -- 空着
+`model`,           -- 模型动态生效：deepseek / qwen / glm / gpt
+`sort`,
+`status`
+) VALUES (
+'学习效果评估智能体',
+'evaluation',
+'分析学习行为、答题、路径完成度，生成AI评估报告',
+'evaluation',
+'',   -- 提示词不入库！
+'deepseek-chat',  -- 模型可随时改
+7,
+1
+);
+
+ ALTER TABLE `learning_path`
+  ADD COLUMN `duration` varchar(50) DEFAULT NULL COMMENT '学习周期描述 如2周/1个月/2个月/3个月' AFTER `status`;
