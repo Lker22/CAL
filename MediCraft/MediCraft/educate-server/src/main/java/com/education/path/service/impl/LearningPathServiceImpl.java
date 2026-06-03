@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.education.resource.mapper.LearningResourceMapper;
+import com.education.resource.mapper.AiAgentMapper;
+import com.education.resource.service.impl.ResourceService;
+import com.education.outcome.service.QuestionAnswerRecordService;
 import com.education.entity.LearningBehavior;
 import com.education.entity.LearningPath;
 import com.education.entity.LearningPathStep;
@@ -42,17 +45,26 @@ public class LearningPathServiceImpl implements LearningPathService {
     private final LearningBehaviorMapper behaviorMapper;
     private final LearningResourceMapper resourceMapper;
     private final ChatClient chatClient;
+    private final ResourceService resourceService;
+    private final AiAgentMapper aiAgentMapper;
+    private final QuestionAnswerRecordService questionAnswerRecordService;
 
     public LearningPathServiceImpl(LearningPathMapper pathMapper,
                                     LearningPathStepMapper stepMapper,
                                     LearningBehaviorMapper behaviorMapper,
                                     LearningResourceMapper resourceMapper,
-                                    ChatClient.Builder chatClientBuilder) {
+                                    ChatClient.Builder chatClientBuilder,
+                                    ResourceService resourceService,
+                                    AiAgentMapper aiAgentMapper,
+                                    QuestionAnswerRecordService questionAnswerRecordService) {
         this.pathMapper = pathMapper;
         this.stepMapper = stepMapper;
         this.behaviorMapper = behaviorMapper;
         this.resourceMapper = resourceMapper;
         this.chatClient = chatClientBuilder.build();
+        this.resourceService = resourceService;
+        this.aiAgentMapper = aiAgentMapper;
+        this.questionAnswerRecordService = questionAnswerRecordService;
     }
 
     /**
@@ -298,6 +310,9 @@ public class LearningPathServiceImpl implements LearningPathService {
             }
         }
 
+        // 最后一个步骤为测验类型
+        int maxSort = steps.stream().mapToInt(LearningPathStep::getSort).max().orElse(0);
+
         for (LearningPathStep step : steps) {
             LearningPathStepVO stepVO = new LearningPathStepVO();
             stepVO.setId(step.getId());
@@ -306,6 +321,12 @@ public class LearningPathServiceImpl implements LearningPathService {
             stepVO.setDescription(step.getStepContent());
             stepVO.setSort(step.getSort());
             stepVO.setDuration("3-5天");
+
+            // 设置步骤类型: 最后一步为quiz, 其余为document
+            stepVO.setStepType(step.getSort() == maxSort ? "quiz" : "document");
+
+            // 设置资源ID供前端判断缓存
+            stepVO.setResourceIds(step.getResourceIds());
 
             if (step.getFinishStatus() != null && step.getFinishStatus() == 1) {
                 stepVO.setStatus("completed");
@@ -921,5 +942,177 @@ public class LearningPathServiceImpl implements LearningPathService {
         behaviorMapper.insert(behavior);
 
         return Result.success(null);
+    }
+
+    /**
+     * 生成步骤学习资源
+     * 检查缓存 → 有则直接返回 / 无则调用智能体生成
+     */
+    @Override
+    public Result<?> generateStepResource(Long stepId, Long userId) {
+        LearningPathStep step = stepMapper.selectById(stepId);
+        if (step == null) return Result.fail(404, "步骤不存在");
+        LearningPath path = pathMapper.selectById(step.getPathId());
+        if (path == null || !path.getUserId().equals(userId))
+            return Result.fail(403, "无权操作");
+
+        // 检查是否已有缓存资源
+        if (step.getResourceIds() != null && !step.getResourceIds().isEmpty()) {
+            String firstId = step.getResourceIds().split(",")[0].trim();
+            try {
+                LearningResource existing = resourceMapper.selectById(Long.parseLong(firstId));
+                if (existing != null) {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("status", "cached");
+                    result.put("resource", existing);
+                    return Result.success(result);
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        // 判断步骤类型: 最后一步用question agent, 其余用document agent
+        List<LearningPathStep> allSteps = stepMapper.selectByPathId(step.getPathId());
+        int maxSort = allSteps.stream().mapToInt(LearningPathStep::getSort).max().orElse(0);
+        String agentRole = (step.getSort() == maxSort) ? "question" : "document";
+
+        // 查找对应智能体
+        LambdaQueryWrapper<com.education.entity.AiAgent> agentWrapper = new LambdaQueryWrapper<>();
+        agentWrapper.eq(com.education.entity.AiAgent::getAgentRole, agentRole)
+                    .eq(com.education.entity.AiAgent::getStatus, 1)
+                    .last("LIMIT 1");
+        com.education.entity.AiAgent agent = new com.education.entity.AiAgent();
+        // 使用MyBatis-Plus的mapper查询
+        try {
+            agent = aiAgentMapper.selectOne(agentWrapper);
+        } catch (Exception e) {
+            log.warn("查询智能体失败: {}", e.getMessage());
+        }
+        if (agent == null || agent.getId() == null) {
+            return Result.fail(500, "智能体不存在: " + agentRole);
+        }
+
+        // 构建生成参数
+        JSONObject params = new JSONObject();
+        if ("question".equals(agentRole)) {
+            params.put("questionCount", "5");
+            params.put("questionType", "选择题");
+            params.put("difficulty", "中等");
+        }
+
+        // 检查是否已有进行中的任务(防重复生成)
+        // 直接调用ResourceService创建生成任务
+        String taskId = resourceService.createGenerateTask(userId, agent.getId(), step.getStepName(), params);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "generating");
+        result.put("taskId", taskId);
+        return Result.success(result);
+    }
+
+    /**
+     * 关联生成的资源到步骤
+     */
+    @Override
+    public Result<?> linkResourceToStep(Long stepId, Long resourceId, Long userId) {
+        LearningPathStep step = stepMapper.selectById(stepId);
+        if (step == null) return Result.fail(404, "步骤不存在");
+        LearningPath path = pathMapper.selectById(step.getPathId());
+        if (path == null || !path.getUserId().equals(userId))
+            return Result.fail(403, "无权操作");
+
+        String existing = step.getResourceIds();
+        String newIds = (existing == null || existing.isEmpty())
+                ? String.valueOf(resourceId)
+                : existing + "," + resourceId;
+
+        LambdaUpdateWrapper<LearningPathStep> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(LearningPathStep::getId, stepId)
+               .set(LearningPathStep::getResourceIds, newIds);
+        stepMapper.update(null, wrapper);
+
+        return Result.success(null);
+    }
+
+    /**
+     * 提交测验答案
+     * 将答题记录写入question_answer_record表, 供评估模块统计
+     */
+    @Override
+    public Result<?> submitQuiz(Long stepId, Long userId, List<com.education.dto.QuizAnswerDTO> answers) {
+        LearningPathStep step = stepMapper.selectById(stepId);
+        if (step == null) return Result.fail(404, "步骤不存在");
+        LearningPath path = pathMapper.selectById(step.getPathId());
+        if (path == null || !path.getUserId().equals(userId))
+            return Result.fail(403, "无权操作");
+
+        // 获取题库资源
+        if (step.getResourceIds() == null || step.getResourceIds().isEmpty())
+            return Result.fail(400, "该步骤无题库资源");
+        Long resourceId;
+        try {
+            resourceId = Long.parseLong(step.getResourceIds().split(",")[0].trim());
+        } catch (NumberFormatException e) {
+            return Result.fail(400, "资源ID格式错误");
+        }
+        LearningResource resource = resourceMapper.selectById(resourceId);
+        if (resource == null) return Result.fail(404, "题库资源不存在");
+
+        // 解析题库JSON获取正确答案
+        JSONArray questions = parseQuizContent(resource.getResourceContent());
+
+        // 逐题保存答题记录
+        int correctCount = 0;
+        for (com.education.dto.QuizAnswerDTO answer : answers) {
+            com.education.entity.QuestionAnswerRecord record = new com.education.entity.QuestionAnswerRecord();
+            record.setUserId(userId);
+            record.setResourceId(resourceId);
+            record.setQuestionId(answer.getQuestionId());
+            record.setUserAnswer(answer.getUserAnswer());
+            record.setSpendTime(answer.getSpendTime());
+            record.setAnswerTime(LocalDateTime.now());
+
+            if (answer.getQuestionId() != null && answer.getQuestionId() < questions.size()) {
+                JSONObject q = questions.getJSONObject(answer.getQuestionId());
+                String correctAnswer = q.getString("answer");
+                record.setCorrectAnswer(correctAnswer);
+                boolean isCorrect = answer.getUserAnswer() != null
+                        && answer.getUserAnswer().equalsIgnoreCase(correctAnswer);
+                record.setIsCorrect(isCorrect ? 1 : 0);
+                if (isCorrect) correctCount++;
+            }
+            questionAnswerRecordService.save(record);
+        }
+
+        // 返回评分结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", answers.size());
+        result.put("correct", correctCount);
+        result.put("score", answers.isEmpty() ? 0 : Math.round((double) correctCount / answers.size() * 100));
+        return Result.success(result);
+    }
+
+    /**
+     * 解析题库内容为JSON数组
+     * 支持纯JSON、Markdown代码块中的JSON、纯文本格式
+     */
+    private JSONArray parseQuizContent(String content) {
+        if (content == null || content.isEmpty()) return new JSONArray();
+        try {
+            // 尝试直接解析JSON
+            JSONArray arr = JSONArray.parseArray(content);
+            if (!arr.isEmpty()) return arr;
+        } catch (Exception ignored) {
+        }
+        // 尝试提取markdown代码块中的JSON
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("```(?:json)?\\s*([\\s\\S]*?)```").matcher(content);
+        if (match.find()) {
+            try {
+                JSONArray arr = JSONArray.parseArray(match.group(1).trim());
+                if (!arr.isEmpty()) return arr;
+            } catch (Exception ignored) {
+            }
+        }
+        return new JSONArray();
     }
 }

@@ -99,5 +99,42 @@ export const learningPathApi = {
       method: 'post',
       data
     })
+  },
+
+  /**
+   * 生成步骤学习资源(检查缓存/调用智能体)
+   * @param {Number} stepId
+   */
+  generateStepResource(stepId) {
+    return request({
+      url: `/learning-path/step/${stepId}/generate-resource`,
+      method: 'post',
+      timeout: 120000
+    })
+  },
+
+  /**
+   * 关联生成的资源到步骤
+   * @param {Number} stepId
+   * @param {Number} resourceId
+   */
+  linkResourceToStep(stepId, resourceId) {
+    return request({
+      url: `/learning-path/step/${stepId}/link-resource/${resourceId}`,
+      method: 'post'
+    })
+  },
+
+  /**
+   * 提交测验答案
+   * @param {Number} stepId
+   * @param {Array} answers - [{ questionId, userAnswer, spendTime }]
+   */
+  submitQuiz(stepId, answers) {
+    return request({
+      url: `/learning-path/step/${stepId}/submit-quiz`,
+      method: 'post',
+      data: answers
+    })
   }
 }

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useResourceStore } from '@/stores/resource'
-import { resourceApi } from '@/api/resource'
+
 import { RESOURCE_TYPES } from '@/utils/constants'
 import { formatDate, formatFileSize } from '@/utils/format'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
@@ -105,15 +105,6 @@ const loadResource = async () => {
   }
 }
 
-// 下载资源
-const handleDownload = async () => {
-  try {
-    await resourceApi.downloadResource(route.params.id)
-    ElMessage.success('开始下载...')
-  } catch {
-    ElMessage.error('下载失败')
-  }
-}
 
 // 返回列表
 const goBack = () => {
@@ -151,12 +142,6 @@ onMounted(() => {
             <span>{{ resource.difficulty || '标准' }}</span>
             <span>{{ formatDate(resource.createTime) }}</span>
           </div>
-        </div>
-        <div class="header-actions">
-          <el-button type="primary" @click="handleDownload">
-            <el-icon><Download /></el-icon>
-            下载
-          </el-button>
         </div>
       </div>
 
@@ -226,9 +211,9 @@ onMounted(() => {
 </template>
 
 <script>
-import { ArrowLeft, Download } from '@element-plus/icons-vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
 export default {
-  components: { ArrowLeft, Download }
+  components: { ArrowLeft }
 }
 </script>
 
@@ -281,10 +266,6 @@ export default {
   gap: 12px;
   font-size: 13px;
   color: #909399;
-}
-
-.header-actions {
-  flex-shrink: 0;
 }
 
 .resource-content {

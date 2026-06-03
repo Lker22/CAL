@@ -157,6 +157,46 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     currentStep.value = null
   }
 
+  /**
+   * 生成步骤学习资源
+   */
+  async function generateStepResource(stepId) {
+    try {
+      const response = await learningPathApi.generateStepResource(stepId)
+      return response.data
+    } catch (error) {
+      console.warn('[LearningPath] 生成步骤资源失败:', error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 关联资源到步骤
+   */
+  async function linkResourceToStep(stepId, resourceId) {
+    try {
+      await learningPathApi.linkResourceToStep(stepId, resourceId)
+      if (currentPath.value && currentPath.value.id) {
+        await getPathDetail(currentPath.value.id)
+      }
+    } catch (error) {
+      console.warn('[LearningPath] 关联资源失败:', error.message)
+    }
+  }
+
+  /**
+   * 提交测验答案
+   */
+  async function submitQuiz(stepId, answers) {
+    try {
+      const response = await learningPathApi.submitQuiz(stepId, answers)
+      return response.data
+    } catch (error) {
+      console.warn('[LearningPath] 提交测验失败:', error.message)
+      throw error
+    }
+  }
+
   return {
     paths,
     currentPath,
@@ -171,6 +211,9 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     getRecommendedResources,
     adjustPath,
     deletePath,
-    clearCurrentPath
+    clearCurrentPath,
+    generateStepResource,
+    linkResourceToStep,
+    submitQuiz
   }
 })

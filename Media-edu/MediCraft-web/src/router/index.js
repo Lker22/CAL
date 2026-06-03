@@ -20,6 +20,7 @@ const PathListView = () => import('@/views/learning-path/PathListView.vue')
 const PathStepView = () => import('@/views/learning-path/PathStepView.vue')
 const ResourceRecommendView = () => import('@/views/learning-path/ResourceRecommendView.vue')
 const PathAdjustView = () => import('@/views/learning-path/PathAdjustView.vue')
+const StepResourceView = () => import('@/views/learning-path/StepResourceView.vue')
 
 // 智能辅导模块
 const TutorQuestionView = () => import('@/views/intelligent-tutor/TutorQuestionView.vue')
@@ -128,6 +129,12 @@ const router = createRouter({
           path: '/path/adjust',
           name: 'path-adjust',
           component: PathAdjustView
+        },
+        {
+          path: '/path/step/:stepId/resource',
+          name: 'step-resource',
+          component: StepResourceView,
+          props: true
         },
 
         // 智能辅导模块

@@ -47,4 +47,19 @@ public interface LearningPathService {
      * 记录学习行为
      */
     Result<?> recordBehavior(Long userId, RecordBehaviorVO vo);
+
+    /**
+     * 生成步骤学习资源
+     */
+    Result<?> generateStepResource(Long stepId, Long userId);
+
+    /**
+     * 关联资源到步骤
+     */
+    Result<?> linkResourceToStep(Long stepId, Long resourceId, Long userId);
+
+    /**
+     * 提交测验答案
+     */
+    Result<?> submitQuiz(Long stepId, Long userId, java.util.List<com.education.dto.QuizAnswerDTO> answers);
 }

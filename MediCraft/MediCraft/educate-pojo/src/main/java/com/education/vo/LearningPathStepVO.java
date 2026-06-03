@@ -46,6 +46,16 @@ public class LearningPathStepVO {
     private List<String> resources;
 
     /**
+     * 关联资源ID(逗号分隔), 前端判断是否已缓存
+     */
+    private String resourceIds;
+
+    /**
+     * 步骤类型: document(学习文档) / quiz(知识测验, 最后一个步骤)
+     */
+    private String stepType;
+
+    /**
      * 完成时间
      */
     private String completedAt;

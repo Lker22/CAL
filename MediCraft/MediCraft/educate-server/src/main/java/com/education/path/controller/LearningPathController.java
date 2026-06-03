@@ -6,10 +6,13 @@ import com.education.vo.AdjustPathVO;
 import com.education.vo.CompleteStepVO;
 import com.education.vo.GeneratePathVO;
 import com.education.vo.RecordBehaviorVO;
+import com.education.dto.QuizAnswerDTO;
 import com.education.result.Result;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 学习路径控制器
@@ -112,5 +115,37 @@ public class LearningPathController {
         Long userId = BaseContext.getCurrentId();
         log.info("记录学习行为, userId={}, type={}", userId, vo.getBehaviorType());
         return learningPathService.recordBehavior(userId, vo);
+    }
+
+    /**
+     * 生成步骤学习资源(检查缓存/调用智能体)
+     * POST /learning-path/step/{stepId}/generate-resource
+     */
+    @PostMapping("/step/{stepId}/generate-resource")
+    public Result<?> generateStepResource(@PathVariable Long stepId) {
+        Long userId = BaseContext.getCurrentId();
+        return learningPathService.generateStepResource(stepId, userId);
+    }
+
+    /**
+     * 关联生成的资源到步骤
+     * POST /learning-path/step/{stepId}/link-resource/{resourceId}
+     */
+    @PostMapping("/step/{stepId}/link-resource/{resourceId}")
+    public Result<?> linkResourceToStep(@PathVariable Long stepId,
+                                         @PathVariable Long resourceId) {
+        Long userId = BaseContext.getCurrentId();
+        return learningPathService.linkResourceToStep(stepId, resourceId, userId);
+    }
+
+    /**
+     * 提交测验答案
+     * POST /learning-path/step/{stepId}/submit-quiz
+     */
+    @PostMapping("/step/{stepId}/submit-quiz")
+    public Result<?> submitQuiz(@PathVariable Long stepId,
+                                @RequestBody List<QuizAnswerDTO> answers) {
+        Long userId = BaseContext.getCurrentId();
+        return learningPathService.submitQuiz(stepId, userId, answers);
     }
 }
